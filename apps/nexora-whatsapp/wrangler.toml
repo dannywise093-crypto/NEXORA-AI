@@ -1,0 +1,14 @@
+name = "nexora-whatsapp-intelligence"
+main = "worker.js"
+compatibility_date = "2026-11-21"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nexora-whatsapp"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+WHATSAPP_GRAPH_VERSION = "v22.0"
+AUTO_REPLY_ENABLED = "false"
+# Set NEXORA_GATEWAY_URL to https://atlas-model-gateway.dannywise093.workers.dev
+# Keep all tokens and app secrets as encrypted Worker secrets, never [vars].
