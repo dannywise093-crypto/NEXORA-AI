@@ -34,7 +34,7 @@ function mockEnvironment({ reviewComplete = true } = {}) {
   };
 }
 
-test("Chief Agent runs six specialists, Writer and Reviewer, then audits citations", async () => {
+test("Deterministic plan runs six specialists, Writer and optional Reviewer, then audits citations", async () => {
   const mock = mockEnvironment();
   const result = await runNexoraAgentTeam({
     prompt: "Design a secure research platform",
@@ -47,20 +47,20 @@ test("Chief Agent runs six specialists, Writer and Reviewer, then audits citatio
   assert.equal(result.plan.length, 6);
   assert.equal(result.agents.length, 6);
   assert.equal(result.reviewer.complete, true);
-  assert.equal(result.reviewer.revisionStatus, "not_required");
+  assert.equal(result.reviewer.revisionStatus, "disabled_for_latency");
   assert.equal(result.sourceAudit.matchedCitationCount, 1);
   assert.equal(result.sourceAudit.unmatchedCitationCount, 0);
   assert.equal(result.sourceAudit.pageContentsFetched, false);
-  assert.equal(mock.calls.length, 9);
+  assert.equal(mock.calls.length, 8);
 });
 
-test("Reviewer findings trigger one full-report revision", async () => {
+test("Reviewer findings do not block delivery with a slow revision pass", async () => {
   const mock = mockEnvironment({ reviewComplete: false });
   const result = await runNexoraAgentTeam({ prompt: "Plan a deployment", env: mock.env });
   assert.equal(result.reviewer.complete, false);
-  assert.equal(result.reviewer.revisionStatus, "revised");
-  assert.equal(result.answer, "Complete revised report. Rollback plan included.");
-  assert.equal(mock.calls.length, 10);
+  assert.equal(result.reviewer.revisionStatus, "disabled_for_latency");
+  assert.equal(result.answer, "Complete technical report. See https://example.com/source for the source.");
+  assert.equal(mock.calls.length, 8);
 });
 
 test("Source audit flags citations that are not in the retrieved source manifest", async () => {

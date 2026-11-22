@@ -55,8 +55,8 @@ async function callModel(env, system, prompt, maxTokens = 2400, profile = "reaso
   const models = AGENT_MODELS[profile] || AGENT_MODELS.reasoning;
   // Bound each orchestration stage so slow inference cannot leave the browser
   // waiting for several minutes. Backup attempts share one stage deadline.
-  const budgetMs = profile === "fast" ? 18_000 : 24_000;
-  const attemptMs = profile === "fast" ? 9_000 : 12_000;
+  const budgetMs = profile === "fast" ? 10_000 : 14_000;
+  const attemptMs = profile === "fast" ? 5_000 : 7_000;
   const deadline = Date.now() + budgetMs;
   for (const model of models) {
     for (const key of keys) {
@@ -85,7 +85,7 @@ async function callModel(env, system, prompt, maxTokens = 2400, profile = "reaso
     try {
       const result = await Promise.race([
         env.AI.run(FALLBACK_MODEL, { messages, max_tokens: maxTokens, temperature: 0.2 }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Workers AI fallback timed out")), 7_000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Workers AI fallback timed out")), 4_500))
       ]);
       const answer = cleanText(result?.response || result?.choices?.[0]?.message?.content, 16000);
       if (answer) return {
@@ -126,14 +126,11 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
     url: cleanText(source.url, 1000)
   })).filter(source => source.url);
 
-  const planner = await callModel(
-    env,
-    "You are the NEXORA Chief Agent. Plan exactly six complementary specialist workstreams: Platform Architecture, Security Engineering, Implementation Engineering, AI Model and Agent Engineering, Research and Evidence Verification, and Performance and Reliability Engineering. Return only valid JSON with one top-level tasks array; each task must have id, focus, and question. Do not perform the work or invent evidence.",
-    `Task: ${task}\n\nEvidence packet:\n${evidencePacket}\n\nReturn exactly six tasks with ids architecture, security, implementation, ai_models, research_verification, performance.`,
-    1000,
-    "reasoning"
-  );
-  const plan = parsePlan(planner.answer, task);
+  // Use the deterministic six-workstream plan immediately. A separate
+  // planner inference call added a full model round-trip before any specialist
+  // could start and was a major source of end-to-end request timeouts.
+  const planner = { provider: "NEXORA deterministic planner", model: "built-in-six-workstream-plan" };
+  const plan = defaultTasks(task);
   const specialistResults = await Promise.all(plan.map(async item => {
     try {
       const result = await callModel(
@@ -164,39 +161,26 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
     "reasoning"
   );
 
-  const reviewer = await callModel(
-    env,
-    "You are the NEXORA Reviewer Agent. Audit the draft for completeness, contradictions, unsupported factual claims, missing security controls, and citation misuse. Return JSON only with keys: complete (boolean), issues (array of short strings), revision_instructions (string). Do not claim you fetched webpages. Treat citations as valid only if they appear in the supplied source manifest.",
-    `User task: ${task}\n\nAllowed source manifest:\n${JSON.stringify(sourceManifest)}\n\nDraft report:\n${writer.answer}\n\nAudit the report.`,
-    1600,
-    "reasoning"
-  );
-  const review = parseJsonObject(reviewer.answer);
-  const issues = Array.isArray(review.issues) ? review.issues.map(item => cleanText(String(item), 300)).filter(Boolean).slice(0, 10) : [];
-  let finalAnswer = writer.answer;
-  let finalProvider = writer.provider;
-  let finalModel = writer.model;
-  let reportFinishReason = writer.finishReason;
-  let revisionStatus = "not_required";
-  if (review.complete === false || writer.finishReason === "length") {
-    try {
-      const revision = await callModel(
-        env,
-        "You are the NEXORA Writer Agent performing a final revision after quality review. Address the review instructions, complete any unfinished sections, preserve accurate caveats, and output the entire revised report rather than only the changes. Do not invent citations.",
-        `Original task: ${task}\n\nSource manifest:\n${JSON.stringify(sourceManifest)}\n\nReviewer issues:\n${issues.join("\n")}\n\nRevision instructions:\n${cleanText(review.revision_instructions, 2500)}\n\nOriginal report:\n${finalAnswer}\n\nReturn the complete corrected report.`,
-        5200,
-        "reasoning"
-      );
-      finalAnswer = revision.answer;
-      finalProvider = revision.provider;
-      finalModel = revision.model;
-      reportFinishReason = revision.finishReason;
-      revisionStatus = "revised";
-    } catch {
-      revisionStatus = "revision_unavailable";
-    }
+  let reviewer = { provider: "skipped", model: "none", answer: "" };
+  let review = {};
+  try {
+    reviewer = await callModel(
+      env,
+      "You are the NEXORA Reviewer Agent. Briefly audit the draft for major factual contradictions, unsupported claims, and citation misuse. Return JSON only with keys complete (boolean), issues (array), revision_instructions (string). Do not claim you fetched webpages.",
+      `User task: ${task}\\n\\nAllowed source manifest:\\n${JSON.stringify(sourceManifest)}\\n\\nDraft report:\\n${writer.answer}\\n\\nReturn a concise audit.`,
+      900,
+      "fast"
+    );
+    review = parseJsonObject(reviewer.answer);
+  } catch {
+    reviewer = { provider: "unavailable", model: "none", answer: "" };
   }
-
+  const issues = Array.isArray(review.issues) ? review.issues.map(item => cleanText(String(item), 300)).filter(Boolean).slice(0, 10) : [];
+  const finalAnswer = writer.answer;
+  const finalProvider = writer.provider;
+  const finalModel = writer.model;
+  const reportFinishReason = writer.finishReason;
+  const revisionStatus = "disabled_for_latency";
   const sourceAudit = auditCitations(finalAnswer, sourceManifest);
   return {
     answer: finalAnswer,
@@ -206,7 +190,7 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
     plan: plan.map(({ id, focus }) => ({ id, focus })),
     agents: specialistResults,
     reviewer: {
-      status: "completed",
+      status: reviewer.provider === "unavailable" || reviewer.provider === "skipped" ? "unavailable" : "completed",
       provider: reviewer.provider,
       model: reviewer.model,
       complete: review.complete === true && issues.length === 0,
