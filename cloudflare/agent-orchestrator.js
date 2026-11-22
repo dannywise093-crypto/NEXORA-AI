@@ -7,6 +7,20 @@ function cleanText(value, max = 7000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
+async function withTimeout(promise, timeoutMs) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Fast fallback deadline exceeded.")), timeoutMs);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function parseJsonObject(text) {
   try {
     const candidate = text.match(/\{[\s\S]*\}/)?.[0];
@@ -29,7 +43,7 @@ function defaultTasks(prompt) {
 
 function requiresFullTeam(prompt) {
   const text = String(prompt || "");
-  return text.length > 220 || /\\b(research|investigate|comprehensive|in depth|architecture|design a system|design a platform|compare|evaluate|audit|security review|roadmap|implementation plan|multi[- ]step|technical report|deep dive|analy[sz]e in detail)\\b/i.test(text);
+  return text.length > 220 || /\b(research|investigate|comprehensive|in depth|architecture|design a system|design a platform|compare|evaluate|audit|security review|roadmap|implementation plan|multi[- ]step|technical report|deep dive|analy[sz]e in detail)\b/i.test(text);
 }
 
 function parsePlan(text, prompt) {
@@ -95,12 +109,7 @@ async function callModel(env, system, prompt, maxTokens = 2400, profile = "reaso
         max_tokens: maxTokens,
         temperature: 0.2
       });
-      const result = profile === "fast"
-        ? await Promise.race([
-            fallback,
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Fast fallback deadline exceeded.")), 18000))
-          ])
-        : await fallback;
+      const result = profile === "fast" ? await withTimeout(fallback, 18000) : await fallback;
       const answer = cleanText(result?.response || result?.choices?.[0]?.message?.content, 16000);
       if (answer) return {
         answer,
