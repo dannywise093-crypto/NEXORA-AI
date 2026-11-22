@@ -316,7 +316,16 @@ def test_subagents_share_one_run_local_tracker_and_reserve_output_for_writer():
     subagents = build_deep_research_subagents(_graph_context(final_report_tracker=tracker))
     by_name = {subagent["name"]: subagent for subagent in subagents}
 
-    for name in ("source-router-agent", "planner-agent"):
+    for name in (
+        "source-router-agent",
+        "planner-agent",
+        "platform-architecture-agent",
+        "security-engineering-agent",
+        "implementation-engineering-agent",
+        "ai-model-agent",
+        "evidence-verification-agent",
+        "performance-reliability-agent",
+    ):
         assert any(isinstance(item, FinalReportOwnershipGuardMiddleware) for item in by_name[name]["middleware"])
         assert any(isinstance(item, StateMutationGuardMiddleware) for item in by_name[name]["middleware"])
         assert not any(isinstance(item, FinalReportCommitMiddleware) for item in by_name[name]["middleware"])
