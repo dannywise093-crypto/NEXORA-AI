@@ -1,2 +1,2 @@
-import { forward } from "./_gateway.js";
+import { forward } from "../lib/vercel-gateway.js";
 export default function handler(req, res) { return forward(req, res, "/api/provider-health", "GET"); }
