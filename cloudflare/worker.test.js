@@ -3,11 +3,14 @@ import assert from "node:assert/strict";
 import worker from "./worker.js";
 
 const token = "test-only-atlas-token";
+let requestSequence = 0;
 function request(path, { method = "GET", body, auth = true } = {}) {
+  requestSequence = (requestSequence % 250) + 1;
   return new Request(`https://atlas.test${path}`, {
     method,
     headers: {
       ...(body === undefined ? {} : { "content-type": "application/json" }),
+      "cf-connecting-ip": `192.0.2.${requestSequence}`,
       ...(auth ? { authorization: `Bearer ${token}` } : {}),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
