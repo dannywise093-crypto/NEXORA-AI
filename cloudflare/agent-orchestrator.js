@@ -126,8 +126,8 @@ function isPublicWebUrl(value) {
     const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
     if (url.protocol !== "https:" || url.username || url.password) return false;
     if (url.port && url.port !== "443") return false;
-    if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
-    if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(host) || host.includes(":")) return false;
+    if (!host || !host.includes(".") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
+    if (/^[0-9.]+$/.test(host) || /^0x[0-9a-f]+$/i.test(host) || host.includes(":")) return false;
     return true;
   } catch { return false; }
 }
