@@ -1,6 +1,7 @@
 import { formatResearchEvidence, needsLiveResearch, searchWeb } from "./knowledge.js";
 import { archiveResearchResults } from "./knowledgeArchive.js";
 import { buildSkillContext, getSkillCatalogStats } from "./skill-orchestrator.js";
+import { checkProviderHealth, formatMultiProviderEvidence, runResearchSearch } from "./provider-integrations.js";
 const MODELS = [
   // Live Workers AI measurement: Llama returned a complete 920-token code answer
   // in ~29 seconds. The previous 9-second deadline guaranteed false timeouts.
@@ -265,10 +266,26 @@ export default {
     if (url.pathname === "/api/providers") {
       if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
-      return json({ defaultProvider: env.NVIDIA_API_KEY ? "nvidia" : "atlas", providers: {
-        atlas: { configured: Boolean(env.AI), label: "Cloudflare Workers AI", role: env.NVIDIA_API_KEY ? "fallback" : "primary" },
-        nvidia: { configured: Boolean(env.NVIDIA_API_KEY), label: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", role: env.NVIDIA_API_KEY ? "primary" : "not_configured" }
+      const searchProviders = {
+        tavily: { configured: Boolean(env.TAVILY_API_KEY), label: "Tavily" },
+        exa: { configured: Boolean(env.EXA_API_KEY), label: "Exa" },
+        nimble: { configured: Boolean(env.NIMBLE_API_KEY), label: "Nimble" },
+        serper: { configured: Boolean(env.SERPER_API_KEY), label: "Serper" },
+        you: { configured: Boolean(env.YDC_API_KEY), label: "You.com" }
+      };
+      const deepResearchReady = Boolean(env.NVIDIA_API_KEY || env.NVIDIA_API_KEY_2) && Object.values(searchProviders).some((item) => item.configured);
+      return json({ defaultProvider: env.NVIDIA_API_KEY || env.NVIDIA_API_KEY_2 ? "nvidia" : "atlas", providers: {
+        atlas: { configured: Boolean(env.AI), label: "Cloudflare Workers AI", role: env.NVIDIA_API_KEY || env.NVIDIA_API_KEY_2 ? "fallback" : "primary" },
+        nvidia: { configured: Boolean(env.NVIDIA_API_KEY || env.NVIDIA_API_KEY_2), label: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", role: env.NVIDIA_API_KEY || env.NVIDIA_API_KEY_2 ? "primary" : "not_configured" },
+        ...searchProviders,
+        deep_research: { configured: deepResearchReady, label: "NVIDIA Deep Researcher", role: "research_mode" }
       }, skills: getSkillCatalogStats() });
+    }
+    if (url.pathname === "/api/provider-health") {
+      if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      const health = await checkProviderHealth(env);
+      return json(health);
     }
     if (url.pathname === "/api/skills") {
       if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
@@ -436,7 +453,22 @@ export default {
         skills: { selected: [], specialists: [], ...skillInventory },
       });
     }
-    if (needsLiveResearch(latestPrompt)) {
+    const researchMode = body?.researchMode === true && !isCopilot;
+    if (researchMode) {
+      const multiProviderResearch = await runResearchSearch(latestPrompt, env);
+      const evidence = formatMultiProviderEvidence(multiProviderResearch);
+      research = {
+        status: multiProviderResearch.status,
+        sources: multiProviderResearch.sources,
+        checkedAt: multiProviderResearch.checkedAt,
+        providers: multiProviderResearch.providers,
+        archive: { status: env.KNOWLEDGE_DB ? "not_configured_for_multi_provider" : "disabled", storedSources: 0, storedChunks: 0 }
+      };
+      modelMessages = [
+        ...messages.slice(0, -1),
+        { role: "user", content: latestPrompt + "\n\n" + evidence },
+      ];
+    } else if (needsLiveResearch(latestPrompt)) {
       const searchResult = await searchWeb(latestPrompt);
       const evidence = formatResearchEvidence(searchResult);
       const archive = await archiveResearchResults(env.KNOWLEDGE_DB, searchResult, evidence.checkedAt);
@@ -458,7 +490,11 @@ export default {
     const baseSystemPrompt = isCopilot ? COPILOT_SYSTEM_PROMPT : SYSTEM_PROMPT;
     const skillInventoryPrompt = `INTERNAL ATLAS SKILL ROUTING METADATA (authoritative runtime facts): ${skillInventory.skillCount} installed skill records; ${skillInventory.maxSkillsPerRequest} maximum selected for a single request; ${skillInventory.specialistCount} built-in specialist categories. These are distinct counts. Never confuse the per-request selection limit with the installed catalogue total. If the user explicitly asks about ATLAS skills, specialist routing, or catalogue counts, use these exact values. Otherwise keep all routing and catalogue metadata internal: do not mention skills, selected references, specialist labels, installed counts, selection limits, or append a skills footer to ordinary answers. Use relevant skill guidance silently to improve the answer. The catalogue contains instructions; it does not automatically install external runtimes, GPUs, credentials, or services.`;
     const voiceStylePrompt = voiceMode ? `VOICE SESSION STYLE\nYou are speaking aloud in a composed, J.A.R.V.I.S.-inspired butler manner. Do not claim to be the fictional character or a product from Iron Man. Address the user as “sir” in every reply. Use polished British English, calm formal precision, concise natural spoken sentences, and occasional understated dry wit. Avoid markdown, headings, bullet lists and tables unless the user asks for them or they are essential. Keep answers easy to hear and follow. Do not claim microphone access or continuous listening; the application controls those functions.` : "";
+    const deepResearchPrompt = researchMode
+      ? "\n\nNEXORA DEEP RESEARCH MODE: You are conducting a multi-source investigation. Synthesize the retrieved evidence, compare providers, identify disagreements and evidence gaps, prefer primary sources where available, cite URLs inline, distinguish source snippets from verified full-page contents, and never invent citations, dates, statistics, or findings. If the search providers did not return usable sources, clearly disclose that the investigation could not verify current claims."
+      : "";
     const systemPrompt = baseSystemPrompt
+      + deepResearchPrompt
       + (voiceStylePrompt ? "\n\n" + voiceStylePrompt : "")
       + "\n\n" + skillInventoryPrompt
       + (routedSkills.context ? "\n\n" + routedSkills.context : "")
@@ -466,17 +502,18 @@ export default {
     const failures = [];
     // NVIDIA is the primary model when configured. It receives the same system
     // prompt and routed skill context as the native Workers AI fallback.
-    if (env.NVIDIA_API_KEY) {
+    const nvidiaKeys = [env.NVIDIA_API_KEY, env.NVIDIA_API_KEY_2].filter(Boolean);
+    for (let keyIndex = 0; keyIndex < nvidiaKeys.length; keyIndex++) {
       const startedAt = Date.now();
       try {
         const upstream = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
           method: "POST",
-          headers: { Authorization: "Bearer " + env.NVIDIA_API_KEY, "Content-Type": "application/json", Accept: "application/json" },
+          headers: { Authorization: "Bearer " + nvidiaKeys[keyIndex], "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify({
             model: "nvidia/nemotron-3-ultra-550b-a55b",
             messages: [{ role: "system", content: systemPrompt }, ...modelMessages],
             temperature: isCopilot ? 0.2 : 0.4,
-            max_tokens: isCopilot ? 6000 : 4096,
+            max_tokens: isCopilot ? 6000 : (researchMode ? 6000 : 4096),
             stream: false
           }),
           signal: AbortSignal.timeout(100_000)
@@ -486,20 +523,21 @@ export default {
           const answer = extractAnswer(result);
           if (answer) {
             const sourceFooter = research.sources.length
-              ? "\n\nSources checked (" + research.checkedAt + "):\n" + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\n") + "\nThese are search-result snippets; full source pages were not independently verified."
+              ? "\\n\\nSources checked (" + research.checkedAt + "):\\n" + research.sources.map((source, index) => (index + 1) + ". [" + (source.provider || "web") + "] " + source.title + " — " + source.url).join("\\n")
+                + "\\nSearch snippets were retrieved from the listed providers; full source pages were not independently verified."
               : research.status === "unavailable" || research.status === "no_results"
-                ? "\n\nLive web research could not provide usable sources for this request. Current facts have not been independently verified."
+                ? "\\n\\nLive research could not provide usable sources. Current claims have not been independently verified."
                 : "";
-            return json({ answer: answer.trim() + sourceFooter, provider: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory } });
+            return json({ answer: answer.trim() + sourceFooter, provider: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", nvidiaKeySlot: keyIndex === 0 ? "primary" : "backup", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory } });
           }
-          failures.push({ provider: "nvidia", status: "empty_response", durationMs: Date.now() - startedAt });
+          failures.push({ provider: keyIndex === 0 ? "nvidia" : "nvidia_backup", status: "empty_response", durationMs: Date.now() - startedAt });
         } else {
-          failures.push({ provider: "nvidia", status: "upstream_error", httpStatus: upstream.status, durationMs: Date.now() - startedAt });
-          console.warn("ATLAS NVIDIA inference failed", upstream.status);
+          failures.push({ provider: keyIndex === 0 ? "nvidia" : "nvidia_backup", status: "upstream_error", httpStatus: upstream.status, durationMs: Date.now() - startedAt });
+          console.warn("NEXORA NVIDIA inference failed", upstream.status, keyIndex === 0 ? "primary" : "backup");
         }
       } catch {
-        failures.push({ provider: "nvidia", status: "connection_error", durationMs: Date.now() - startedAt });
-        console.warn("ATLAS NVIDIA inference connection failed");
+        failures.push({ provider: keyIndex === 0 ? "nvidia" : "nvidia_backup", status: "connection_error", durationMs: Date.now() - startedAt });
+        console.warn("NEXORA NVIDIA inference connection failed", keyIndex === 0 ? "primary" : "backup");
       }
     }
     for (const model of MODELS) {
