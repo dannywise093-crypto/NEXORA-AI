@@ -154,6 +154,19 @@ test("chat allows Cloudflare to queue busy inference instead of rejecting immedi
   assert.equal(callCount, 2);
 });
 
+test("chat converts escaped newline sequences into readable paragraphs", async () => {
+  const env = envWith(async () => ({
+    choices: [{ message: { content: "First line\\nSecond line" } }],
+  }));
+  const response = await worker.fetch(request("/api/chat", {
+    method: "POST",
+    body: { messages: [{ role: "user", content: "Explain this simply." }] },
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.answer, "First line\nSecond line");
+});
+
 test("chat falls back when the primary model is unavailable", async () => {
   const attempts = [];
   const env = envWith(async (model) => {
