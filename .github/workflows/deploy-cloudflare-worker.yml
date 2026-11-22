@@ -1,0 +1,39 @@
+name: Deploy NEXORA AI Cloudflare gateway
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cloudflare-worker.yml"
+      - "cloudflare/**"
+      - "scripts/build-skill-catalog.js"
+      - ".agents/skills/**"
+      - "wrangler.jsonc"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out NEXORA AI
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build generated skill catalogue and deploy gateway
+        run: npm run deploy:worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: a5c4e4218e2cfa4196341ae2edcb194f
