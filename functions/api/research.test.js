@@ -44,7 +44,7 @@ test("research proxy keeps the backend token server-side and streams upstream bo
       request,
       env: {
         DEEP_RESEARCHER_URL: "https://research.example/",
-        NEXORA_RESEARCH_API_TOKEN: "server-only-test-token"
+        NEXORA_RESEARCH_API_TOKEN: "server-only-test-token-012345678901234567890123456789"
       }
     });
     assert.equal(response.status, 200);

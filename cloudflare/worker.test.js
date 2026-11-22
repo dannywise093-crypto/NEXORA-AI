@@ -103,7 +103,7 @@ test("main ATLAS chat routes NVIDIA skills and specialist context", async () => 
   assert.equal(response.status, 200);
   assert.match(systemPrompt, /ATLAS SPECIALIST ROUTER/);
   assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
-  assert.match(systemPrompt, /Do not invent an expansion for the name ATLAS/);
+  assert.match(systemPrompt, /NEXORA means Next-Generation Engineering/);
   assert.match(systemPrompt, /Numerical Optimization & Operations Research/);
   assert.match(systemPrompt, /Computer Vision & Imaging/);
   assert.match(systemPrompt, /lexical overlap across skill names, tags, and descriptions/);
@@ -273,7 +273,7 @@ test("dedicated Copilot route uses the ATLAS coding-agent instructions", async (
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.equal(body.answer, "Copilot mode response");
-  assert.match(modelInput.messages[0].content, /ATLAS Copilot, the software engineering assistant/);
+  assert.match(modelInput.messages[0].content, /NEXORA Copilot, the software engineering assistant/);
   assert.match(modelInput.messages[0].content, /complete, runnable source code/);
   assert.match(modelInput.messages[0].content, /If the user asks you to fix code, fix the code they supplied/);
   assert.match(modelInput.messages[0].content, /Never invent test output/);
