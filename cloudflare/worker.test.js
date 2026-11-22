@@ -103,7 +103,7 @@ test("main ATLAS chat routes NVIDIA skills and specialist context", async () => 
   assert.equal(response.status, 200);
   assert.match(systemPrompt, /ATLAS SPECIALIST ROUTER/);
   assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
-  assert.match(systemPrompt, /NEXORA means Next-Generation Engineering/);
+  assert.match(systemPrompt, /If asked what NEXORA means, answer: “Next-Generation Engineering, Research & Advanced Artificial Intelligence\.”/);
   assert.match(systemPrompt, /Numerical Optimization & Operations Research/);
   assert.match(systemPrompt, /Computer Vision & Imaging/);
   assert.match(systemPrompt, /lexical overlap across skill names, tags, and descriptions/);
