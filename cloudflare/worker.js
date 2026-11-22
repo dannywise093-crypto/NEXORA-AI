@@ -527,7 +527,9 @@ export default {
           plan: teamResult.plan,
           agents: teamResult.agents,
           reviewer: teamResult.reviewer,
+          executionSummary: teamResult.executionSummary,
           sourceAudit: teamResult.sourceAudit,
+          sourceVerification: teamResult.sourceVerification,
           reportComplete: teamResult.reportComplete,
           progress: [
             { id: "planner", label: "Chief Agent · planning", status: "completed" },
