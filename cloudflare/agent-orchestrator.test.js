@@ -14,9 +14,12 @@ function mockEnvironment({ reviewComplete = true } = {}) {
           calls.push({ system, prompt });
           if (system.includes("Chief Agent")) {
             return { response: JSON.stringify({ tasks: [
-              { id: "architecture", focus: "Architecture", question: "Design the architecture" },
-              { id: "security", focus: "Security", question: "Review security" },
-              { id: "implementation", focus: "Implementation", question: "Plan implementation" }
+              { id: "architecture", focus: "Platform Architecture", question: "Design the architecture" },
+              { id: "security", focus: "Security Engineering", question: "Review security" },
+              { id: "implementation", focus: "Implementation Engineering", question: "Plan implementation" },
+              { id: "ai_models", focus: "AI Model and Agent Engineering", question: "Review model routing" },
+              { id: "research_verification", focus: "Research and Evidence Verification", question: "Verify evidence" },
+              { id: "performance", focus: "Performance and Reliability Engineering", question: "Review performance" }
             ] }) };
           }
           if (system.includes("Reviewer Agent")) {
@@ -31,7 +34,7 @@ function mockEnvironment({ reviewComplete = true } = {}) {
   };
 }
 
-test("Chief Agent runs three specialists, Writer and Reviewer, then audits citations", async () => {
+test("Chief Agent runs six specialists, Writer and Reviewer, then audits citations", async () => {
   const mock = mockEnvironment();
   const result = await runNexoraAgentTeam({
     prompt: "Design a secure research platform",
@@ -41,14 +44,14 @@ test("Chief Agent runs three specialists, Writer and Reviewer, then audits citat
   });
   assert.equal(result.answer.includes("Complete technical report"), true);
   assert.equal(result.orchestration, "completed");
-  assert.equal(result.plan.length, 3);
-  assert.equal(result.agents.length, 3);
+  assert.equal(result.plan.length, 6);
+  assert.equal(result.agents.length, 6);
   assert.equal(result.reviewer.complete, true);
   assert.equal(result.reviewer.revisionStatus, "not_required");
   assert.equal(result.sourceAudit.matchedCitationCount, 1);
   assert.equal(result.sourceAudit.unmatchedCitationCount, 0);
   assert.equal(result.sourceAudit.pageContentsFetched, false);
-  assert.equal(mock.calls.length, 6);
+  assert.equal(mock.calls.length, 9);
 });
 
 test("Reviewer findings trigger one full-report revision", async () => {
@@ -57,7 +60,7 @@ test("Reviewer findings trigger one full-report revision", async () => {
   assert.equal(result.reviewer.complete, false);
   assert.equal(result.reviewer.revisionStatus, "revised");
   assert.equal(result.answer, "Complete revised report. Rollback plan included.");
-  assert.equal(mock.calls.length, 7);
+  assert.equal(mock.calls.length, 10);
 });
 
 test("Source audit flags citations that are not in the retrieved source manifest", async () => {

@@ -51,11 +51,11 @@ function AgentControlCenter({ run }) {
     <header><div><b>NEXORA AGENT CONTROL CENTER</b><small>Supervised multi-agent execution record</small></div><span className={run.reportComplete ? "agent-quality-good" : "agent-quality-warning"}>{run.reportComplete ? "Report complete" : "Completion needs review"}</span></header>
     <div className="nexora-agent-progress">{progress.map(agent => <div className="nexora-agent-step" key={agent.id}><span className={agent.status === "completed" ? "agent-step-dot done" : "agent-step-dot"} /><span>{agent.label}</span><b>{statusLabel(agent.status)}</b></div>)}</div>
     <details className="nexora-agent-details"><summary>Inspect specialist findings ({(run.agents || []).length})</summary>
-      {(run.agents || []).map(agent => <article className="nexora-agent-finding" key={agent.id}><b>{agent.focus} Agent</b><p>{agent.findings || "No finding payload was returned."}</p><small>Inference: {agent.provider || "gateway"}</small></article>)}
+      {(run.agents || []).map(agent => <article className="nexora-agent-finding" key={agent.id}><b>{agent.focus} Agent</b><p>{agent.findings || "No finding payload was returned."}</p><small>Inference: {agent.provider || "gateway"} · Model: {agent.model || "not reported"}</small></article>)}
     </details>
-    {run.reviewer && <div className="nexora-agent-review"><b>Reviewer Agent · {run.reviewer.complete ? "Passed" : "Review notes"}</b><span>Revision: {run.reviewer.revisionStatus || "not reported"}</span>{run.reviewer.issues?.length > 0 && <ul>{run.reviewer.issues.map((issue,index)=><li key={index}>{issue}</li>)}</ul>}</div>}
+    {run.reviewer && <div className="nexora-agent-review"><b>Reviewer Agent · {run.reviewer.complete ? "Passed" : "Review notes"}</b><span>Revision: {run.reviewer.revisionStatus || "not reported"} · Model: {run.reviewer.model || "not reported"}</span>{run.reviewer.issues?.length > 0 && <ul>{run.reviewer.issues.map((issue,index)=><li key={index}>{issue}</li>)}</ul>}</div>}
     {run.sourceAudit && <details className="nexora-agent-details"><summary>Source integrity audit</summary><p>{run.sourceAudit.note}</p><div className="agent-audit-counts"><span>Sources: {run.sourceAudit.sourceCount}</span><span>Matched citations: {run.sourceAudit.matchedCitationCount}</span><span>Unmatched URLs: {run.sourceAudit.unmatchedCitationCount}</span><span>Page contents fetched: No</span></div>{run.sourceAudit.unmatched?.length > 0 && <ul>{run.sourceAudit.unmatched.map(url=><li key={url}>{url}</li>)}</ul>}</details>}
-    <footer>Execution: {run.orchestration} · Final model: {run.provider}</footer>
+    <footer>Execution: {run.orchestration} · Final inference: {run.provider || "not reported"} · Model: {run.model || "not reported"}</footer>
   </section>;
 }
 
