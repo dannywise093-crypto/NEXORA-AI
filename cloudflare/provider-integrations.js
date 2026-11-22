@@ -130,11 +130,14 @@ async function checkNvidiaKey(key, label) {
 }
 
 export async function checkProviderHealth(env) {
-  const checks = await Promise.all([
+  const tasks = [
     checkNvidiaKey(env.NVIDIA_API_KEY, "nvidia"),
     ...SEARCH_PROVIDERS.map((provider) => searchProvider(provider, env, "NEXORA AI provider connection test")),
-  ]);
-  const backup = env.NVIDIA_API_KEY_2 ? await checkNvidiaKey(env.NVIDIA_API_KEY_2, "nvidia_backup") : null;
+    ...(env.NVIDIA_API_KEY_2 ? [checkNvidiaKey(env.NVIDIA_API_KEY_2, "nvidia_backup")] : []),
+  ];
+  const results = await Promise.all(tasks);
+  const checks = results.slice(0, 6);
+  const backup = env.NVIDIA_API_KEY_2 ? (results[6] || null) : null;
   return {
     checkedAt: new Date().toISOString(),
     providers: checks,
