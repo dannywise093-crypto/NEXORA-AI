@@ -1,4 +1,4 @@
-const PROVIDER_TIMEOUT_MS = 12_000;
+const PROVIDER_TIMEOUT_MS = 8_000;
 const SEARCH_PROVIDERS = [
   { id: "tavily", label: "Tavily", key: "TAVILY_API_KEY" },
   { id: "exa", label: "Exa", key: "EXA_API_KEY" },
@@ -120,7 +120,7 @@ async function checkNvidiaKey(key, label) {
       max_tokens: 8,
       temperature: 0,
       stream: false,
-    }, 20_000);
+    }, 8_000);
     if (!response.ok) return { provider: label, label: label === "nvidia_backup" ? "NVIDIA backup key" : "NVIDIA", status: classifyHttp(response.status), configured: true, httpStatus: response.status, latencyMs: Date.now() - started };
     const answer = data?.choices?.[0]?.message?.content;
     return { provider: label, label: label === "nvidia_backup" ? "NVIDIA backup key" : "NVIDIA", status: typeof answer === "string" && answer.trim() ? "ok" : "invalid_response", configured: true, httpStatus: response.status, latencyMs: Date.now() - started };
