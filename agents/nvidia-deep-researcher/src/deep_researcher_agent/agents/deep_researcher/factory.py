@@ -73,8 +73,8 @@ from .models import ResearchNotes
 from .models import ResearchPlan
 from .models import SourceRoutingPlan
 from .resource_limits import DeepResearchResourceLimits
-from .specialist_catalog import SPECIALIST_ROLES
 from .resource_limits import StateBudgetLedger
+from .specialist_catalog import SPECIALIST_ROLES
 from .tools.research import build_research_batch_tool
 from .tools.source_registry import build_get_verified_sources_tool
 from .tools.source_routing import build_lookup_source_catalog_tool
@@ -532,13 +532,15 @@ def build_deep_research_subagents(context: DeepResearchGraphContext) -> list[dic
         (
             "security-engineering-agent",
             "Security Engineering Specialist",
-            "Analyze threat models, identity, access controls, privacy, prompt injection, supply-chain risk, and mitigations.",
+            "Analyze threat models, identity, access controls, privacy, prompt injection, supply-chain risk, "
+            "and mitigations.",
             "Security, privacy, and threat analysis",
         ),
         (
             "implementation-engineering-agent",
             "Implementation Engineering Specialist",
-            "Translate findings into implementation phases, interfaces, dependencies, tests, deployment, and rollback plans.",
+            "Translate findings into implementation phases, interfaces, dependencies, tests, deployment, "
+            "and rollback plans.",
             "Implementation planning and verification",
         ),
         (
@@ -550,7 +552,8 @@ def build_deep_research_subagents(context: DeepResearchGraphContext) -> list[dic
         (
             "evidence-verification-agent",
             "Research and Evidence Verification Specialist",
-            "Audit source quality, unsupported claims, conflicts, stale sources, missing primary sources, and uncertainty.",
+            "Audit source quality, unsupported claims, conflicts, stale sources, missing primary sources, "
+            "and uncertainty.",
             "Evidence quality, citations, and uncertainty",
         ),
         (
