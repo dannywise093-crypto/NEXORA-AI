@@ -529,7 +529,12 @@ export default {
           reviewer: teamResult.reviewer,
           sourceAudit: teamResult.sourceAudit,
           reportComplete: teamResult.reportComplete,
-          progress: [\n            { id: "planner", label: "Chief Agent · planning", status: "completed" },\n            ...teamResult.agents.map(agent => ({ id: agent.id, label: agent.focus + " Agent", status: agent.status })),\n            { id: "writer", label: "Writer Agent · report synthesis", status: "completed" },\n            { id: "reviewer", label: "Reviewer Agent · quality audit", status: teamResult.reviewer.status }\n          ],
+          progress: [
+            { id: "planner", label: "Chief Agent · planning", status: "completed" },
+            ...teamResult.agents.map(agent => ({ id: agent.id, label: agent.focus + " Agent", status: agent.status })),
+            { id: "writer", label: "Writer Agent · report synthesis", status: "completed" },
+            { id: "reviewer", label: "Reviewer Agent · quality audit", status: teamResult.reviewer.status }
+          ],
           fallbackUsed: teamResult.provider !== "NVIDIA API Catalog",
           research,
           skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory }
