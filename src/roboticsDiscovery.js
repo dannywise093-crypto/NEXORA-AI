@@ -56,7 +56,13 @@ export async function connectNativeBleSensorDevice({ deviceId, loadBleClient = (
   if (!(await BleClient.isEnabled())) throw new Error("Bluetooth is turned off. Enable Bluetooth in Android settings and try again.");
   await BleClient.connect(deviceId);
   const services = await BleClient.getServices(deviceId);
-  const has = (uuid) => services.some(service => String(service.uuid || "").toLowerCase().endsWith(uuid));
+  const normalizeBleUuid = (value) => {
+    const uuid = String(value || "").trim().toLowerCase().replace(/^0x/, "");
+    if (/^[0-9a-f]{4}$/.test(uuid)) return uuid;
+    const canonical = uuid.match(/^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/);
+    return canonical ? canonical[1] : uuid;
+  };
+  const has = (uuid) => services.some(service => normalizeBleUuid(service.uuid) === uuid);
   let deviceName = bleFallbackName(deviceId);
   let nameAvailable = false;
   if (has("1800")) {
