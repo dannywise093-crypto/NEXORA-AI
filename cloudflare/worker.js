@@ -178,6 +178,16 @@ function isTruncated(result) {
   return finishReason === "length" || finishReason === "max_tokens";
 }
 
+function normalizeAnswerText(value) {
+  // Convert escaped newline sequences from upstream models into real line breaks.
+  return String(value || "")
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\n")
+    .replace(/\r\n/g, "\n")
+    .trim();
+}
+
 function extractAnswer(result) {
   // Accept both OpenAI chat-completion and native Workers AI text outputs.
   const candidates = [
@@ -187,9 +197,14 @@ function extractAnswer(result) {
     result?.output_text,
   ];
   for (const value of candidates) {
-    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "string" && value.trim()) return normalizeAnswerText(value);
   }
   return "";
+}
+
+function isSimpleIdentityQuestion(prompt = "") {
+  const text = String(prompt).trim().toLowerCase();
+  return /^(who are you|what is your name|what's your name|who developed you|who is your developer|who is your creator|who created you|who built you|who made you|what company developed you)[?.!]*$/.test(text);
 }
 
 function classifyAIError(error) {
@@ -457,7 +472,9 @@ export default {
     }
     const researchMode = body?.researchMode === true && !isCopilot;
     const agentMode = body?.agentMode === true && !isCopilot;
-    if (researchMode) {
+    const simpleIdentityQuestion = isSimpleIdentityQuestion(latestPrompt);
+    const runAgentWorkflow = (agentMode || researchMode) && !simpleIdentityQuestion;
+    if (researchMode && !simpleIdentityQuestion) {
       const multiProviderResearch = await runResearchSearch(latestPrompt, env);
       const evidence = formatMultiProviderEvidence(multiProviderResearch);
       agentEvidence = evidence;
@@ -472,7 +489,7 @@ export default {
         ...messages.slice(0, -1),
         { role: "user", content: latestPrompt + "\n\n" + evidence },
       ];
-    } else if (needsLiveResearch(latestPrompt)) {
+    } else if (!simpleIdentityQuestion && needsLiveResearch(latestPrompt)) {
       const searchResult = await searchWeb(latestPrompt);
       const evidence = formatResearchEvidence(searchResult);
       agentEvidence = evidence.context;
@@ -495,7 +512,7 @@ export default {
     const baseSystemPrompt = isCopilot ? COPILOT_SYSTEM_PROMPT : SYSTEM_PROMPT;
     const skillInventoryPrompt = `INTERNAL ATLAS SKILL ROUTING METADATA (authoritative runtime facts): ${skillInventory.skillCount} installed skill records; ${skillInventory.maxSkillsPerRequest} maximum selected for a single request; ${skillInventory.specialistCount} built-in specialist categories. These are distinct counts. Never confuse the per-request selection limit with the installed catalogue total. If the user explicitly asks about ATLAS skills, specialist routing, or catalogue counts, use these exact values. Otherwise keep all routing and catalogue metadata internal: do not mention skills, selected references, specialist labels, installed counts, selection limits, or append a skills footer to ordinary answers. Use relevant skill guidance silently to improve the answer. The catalogue contains instructions; it does not automatically install external runtimes, GPUs, credentials, or services.`;
     const voiceStylePrompt = voiceMode ? `VOICE SESSION STYLE\nYou are speaking aloud in a composed, J.A.R.V.I.S.-inspired butler manner. Do not claim to be the fictional character or a product from Iron Man. Address the user as “sir” in every reply. Use polished British English, calm formal precision, concise natural spoken sentences, and occasional understated dry wit. Avoid markdown, headings, bullet lists and tables unless the user asks for them or they are essential. Keep answers easy to hear and follow. Do not claim microphone access or continuous listening; the application controls those functions.` : "";
-    const deepResearchPrompt = researchMode
+    const deepResearchPrompt = researchMode && !simpleIdentityQuestion
       ? "\n\nNEXORA DEEP RESEARCH MODE: You are conducting a multi-source investigation. Synthesize the retrieved evidence, compare providers, identify disagreements and evidence gaps, prefer primary sources where available, cite URLs inline, distinguish source snippets from verified full-page contents, and never invent citations, dates, statistics, or findings. If the search providers did not return usable sources, clearly disclose that the investigation could not verify current claims."
       : "";
     const systemPrompt = baseSystemPrompt
@@ -504,7 +521,7 @@ export default {
       + "\n\n" + skillInventoryPrompt
       + (routedSkills.context ? "\n\n" + routedSkills.context : "")
       + (isCuOptTask(latestPrompt) ? "\n\n" + CUOPT_SKILL_PROMPT : "");
-    if (agentMode || researchMode) {
+    if (runAgentWorkflow) {
       try {
         const teamResult = await runNexoraAgentTeam({
           prompt: latestPrompt,
@@ -513,13 +530,8 @@ export default {
           env,
           mode: researchMode ? "deep_research" : "chief_agent"
         });
-        const sourceFooter = research.sources.length
-          ? "\n\nSources checked (" + research.checkedAt + "):\n"
-            + research.sources.map((source, index) => (index + 1) + ". [" + (source.provider || "web") + "] " + source.title + " — " + source.url).join("\n")
-            + "\nSearch snippets were retrieved from the listed providers; full source pages were not independently verified."
-          : "";
         return json({
-          answer: teamResult.answer + sourceFooter,
+          answer: normalizeAnswerText(teamResult.answer),
           provider: teamResult.provider,
           model: "nexora-multi-agent",
           agentMode: true,
@@ -569,13 +581,7 @@ export default {
         if (upstream.ok) {
           const answer = extractAnswer(result);
           if (answer) {
-            const sourceFooter = research.sources.length
-              ? "\\n\\nSources checked (" + research.checkedAt + "):\\n" + research.sources.map((source, index) => (index + 1) + ". [" + (source.provider || "web") + "] " + source.title + " — " + source.url).join("\\n")
-                + "\\nSearch snippets were retrieved from the listed providers; full source pages were not independently verified."
-              : research.status === "unavailable" || research.status === "no_results"
-                ? "\\n\\nLive research could not provide usable sources. Current claims have not been independently verified."
-                : "";
-            return json({ answer: answer.trim() + sourceFooter, provider: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", nvidiaKeySlot: keyIndex === 0 ? "primary" : "backup", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory } });
+            return json({ answer: normalizeAnswerText(answer), provider: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", nvidiaKeySlot: keyIndex === 0 ? "primary" : "backup", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory } });
           }
           failures.push({ provider: keyIndex === 0 ? "nvidia" : "nvidia_backup", status: "empty_response", durationMs: Date.now() - startedAt });
         } else {
@@ -599,15 +605,8 @@ export default {
         }
         const answer = extractAnswer(result);
         if (answer) {
-          const sourceFooter = research.sources.length
-            ? "\n\nSources checked (" + research.checkedAt + "):\n"
-              + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\n")
-              + "\nThese are search-result snippets; full source pages were not independently verified."
-            : research.status === "unavailable" || research.status === "no_results"
-              ? "\n\nLive web research could not provide usable sources for this request. Current facts have not been independently verified."
-              : "";
           return json({
-            answer: answer.trim() + sourceFooter,
+            answer: normalizeAnswerText(answer),
             model: model.id,
             fallbackUsed: model.id !== MODELS[0].id,
             research,

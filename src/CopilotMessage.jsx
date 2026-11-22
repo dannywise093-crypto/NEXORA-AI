@@ -67,12 +67,30 @@ function PythonRunner({ code }) {
   </div>;
 }
 
-export default function CopilotMessage({ text }) {
-  return <div className="copilot-rich-message">{splitMessage(String(text || "")).map((part, index) =>
-    part.type === "code" ? <section className="copilot-code-card" key={index}>
-      <header><span>{part.language.toUpperCase()}</span><span>COMPLETE SOURCE</span></header>
-      <pre><code>{part.value}</code></pre>
-      {["python","py"].includes(part.language) ? <PythonRunner code={part.value}/> : <div className="copilot-code-unsupported">Copy this source into your {part.language} environment. In-browser execution currently supports Python.</div>}
-    </section> : <p className="copilot-message-text" key={index}>{part.value}</p>
-  )}</div>;
+export default function CopilotMessage({ text, sources = [] }) {
+  const normalizedText = String(text || "")
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\n");
+  const safeSources = Array.isArray(sources) ? sources.filter(source => {
+    try { return ["http:", "https:"].includes(new URL(source.url).protocol); }
+    catch { return false; }
+  }) : [];
+  return <div className="copilot-rich-message">
+    {splitMessage(normalizedText).map((part, index) =>
+      part.type === "code" ? <section className="copilot-code-card" key={index}>
+        <header><span>{part.language.toUpperCase()}</span><span>COMPLETE SOURCE</span></header>
+        <pre><code>{part.value}</code></pre>
+        {["python","py"].includes(part.language) ? <PythonRunner code={part.value}/> : <div className="copilot-code-unsupported">Copy this source into your {part.language} environment. In-browser execution currently supports Python.</div>}
+      </section> : <p className="copilot-message-text" style={{ whiteSpace: "pre-wrap" }} key={index}>{part.value}</p>
+    )}
+    {safeSources.length > 0 && <details className="nexora-sources">
+      <summary>Sources · {safeSources.length}</summary>
+      <ol>{safeSources.map((source, index) => <li key={source.url || index}>
+        <a href={source.url} target="_blank" rel="noopener noreferrer">{source.title || source.url}</a>
+        {source.provider && <span className="nexora-source-provider">{source.provider}</span>}
+      </li>)}</ol>
+      <small>Search-result references. Full page contents may not have been independently verified.</small>
+    </details>}
+  </div>;
 }

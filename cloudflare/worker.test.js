@@ -3,11 +3,14 @@ import assert from "node:assert/strict";
 import worker from "./worker.js";
 
 const token = "test-only-atlas-token";
+let requestSequence = 0;
 function request(path, { method = "GET", body, auth = true } = {}) {
+  requestSequence = (requestSequence % 250) + 1;
   return new Request(`https://atlas.test${path}`, {
     method,
     headers: {
       ...(body === undefined ? {} : { "content-type": "application/json" }),
+      "cf-connecting-ip": `192.0.2.${requestSequence}`,
       ...(auth ? { authorization: `Bearer ${token}` } : {}),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -152,6 +155,41 @@ test("chat allows Cloudflare to queue busy inference instead of rejecting immedi
   assert.equal(response.status, 200);
   assert.equal(body.answer, "Recovered after brief capacity pressure");
   assert.equal(callCount, 2);
+});
+
+test("simple developer identity questions bypass research and multi-agent orchestration", async () => {
+  let modelCalls = 0;
+  const env = envWith(async () => {
+    modelCalls += 1;
+    return { choices: [{ message: { content: "My developer is NEXORA TECHNOLOGIES." } }] };
+  });
+  const response = await worker.fetch(request("/api/chat", {
+    method: "POST",
+    body: {
+      messages: [{ role: "user", content: "Who is your developer?" }],
+      researchMode: true,
+      agentMode: true,
+    },
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.answer, "My developer is NEXORA TECHNOLOGIES.");
+  assert.equal(modelCalls, 1);
+  assert.deepEqual(body.research.sources, []);
+  assert.doesNotMatch(body.answer, /Sources checked|tavily|exa|serper/i);
+});
+
+test("chat converts escaped newline sequences into readable paragraphs", async () => {
+  const env = envWith(async () => ({
+    choices: [{ message: { content: "First line\\nSecond line" } }],
+  }));
+  const response = await worker.fetch(request("/api/chat", {
+    method: "POST",
+    body: { messages: [{ role: "user", content: "Explain this simply." }] },
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.answer, "First line\nSecond line");
 });
 
 test("chat falls back when the primary model is unavailable", async () => {
@@ -380,7 +418,7 @@ test("Cloudflare transcription endpoint sends uploaded audio to Whisper and retu
   form.append("audio", new Blob([new Uint8Array(512).fill(7)], { type: "audio/webm" }), "voice.webm");
   const response = await worker.fetch(new Request("https://atlas.test/api/transcribe", {
     method: "POST",
-    headers: { authorization: "Bearer " + token },
+    headers: { authorization: "Bearer " + token, "cf-connecting-ip": "192.0.2.150" },
     body: form
   }), env);
   const body = await response.json();

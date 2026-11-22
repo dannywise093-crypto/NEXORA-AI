@@ -320,3 +320,14 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
 .agent-audit-counts{display:flex;gap:7px;flex-wrap:wrap}.agent-audit-counts span{padding:6px 8px;border:1px solid #293f5a;border-radius:7px;color:#b7cbe4;font-size:9px}
 .nexora-agent-control footer{padding-top:3px}
 @media(max-width:520px){.nexora-agent-progress{grid-template-columns:1fr}.nexora-agent-step{font-size:10px}.nexora-agent-control{padding:11px}}
+
+
+/* Compact, readable research references in chat messages */
+.nexora-sources{margin-top:8px;padding:10px 12px;border:1px solid #2c4059;border-radius:10px;background:#0d1828}
+.nexora-sources summary{cursor:pointer;color:#a9c9f4;font-size:10px;font-weight:800;letter-spacing:.35px}
+.nexora-sources ol{display:grid;gap:8px;margin:10px 0 7px;padding-left:22px}
+.nexora-sources li{padding-left:3px;color:#91a7c3;font-size:10px;line-height:1.5;overflow-wrap:anywhere}
+.nexora-sources a{color:#c4dcff;text-decoration:none}
+.nexora-sources a:hover{text-decoration:underline}
+.nexora-source-provider{display:inline-block;margin-left:7px;padding:2px 5px;border:1px solid #2b405c;border-radius:5px;color:#90a8c8;font-size:8px;text-transform:uppercase}
+.nexora-sources>small{color:#7f91aa;font-size:9px;line-height:1.4}
