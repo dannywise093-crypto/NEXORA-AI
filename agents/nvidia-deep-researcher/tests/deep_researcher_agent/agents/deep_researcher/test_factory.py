@@ -85,6 +85,7 @@ def _prompts() -> dict[str, str]:
         "researcher": "researcher",
         "orchestrator": "orchestrator",
         "writer": "writer",
+        "specialist_agent": "{{ specialist_name }}: {{ specialist_mandate }} ({{ specialist_focus }})",
     }
 
 
@@ -245,7 +246,17 @@ def test_subagents_route_tools_and_writer_skills():
     subagents = build_deep_research_subagents(_graph_context(runtime=runtime))
 
     by_name = {subagent["name"]: subagent for subagent in subagents}
-    assert set(by_name) == {"source-router-agent", "planner-agent", "writer-agent"}
+    assert set(by_name) == {
+        "source-router-agent",
+        "planner-agent",
+        "writer-agent",
+        "platform-architecture-agent",
+        "security-engineering-agent",
+        "implementation-engineering-agent",
+        "ai-model-agent",
+        "evidence-verification-agent",
+        "performance-reliability-agent",
+    }
     assert by_name["source-router-agent"]["response_format"] is SourceRoutingPlan
     assert _tool_names(by_name["source-router-agent"]["tools"]) == ["lookup_source_catalog"]
     assert "web_search_tool" not in _tool_names(by_name["source-router-agent"]["tools"])
@@ -253,6 +264,23 @@ def test_subagents_route_tools_and_writer_skills():
     assert "web_search_tool" in _tool_names(by_name["planner-agent"]["tools"])
     assert _tool_names(by_name["writer-agent"]["tools"]) == ["think", "get_verified_sources"]
     assert by_name["writer-agent"]["skills"] == ["/skills/synthesis/"]
+    specialist_names = {
+        "platform-architecture-agent",
+        "security-engineering-agent",
+        "implementation-engineering-agent",
+        "ai-model-agent",
+        "evidence-verification-agent",
+        "performance-reliability-agent",
+    }
+    assert specialist_names.issubset(by_name)
+    for name in specialist_names:
+        specialist = by_name[name]
+        assert specialist["model"] is _llm_provider().get(LLMRole.RESEARCHER)
+        assert _tool_names(specialist["tools"]) == ["think", "get_verified_sources"]
+        assert any(isinstance(item, FinalReportOwnershipGuardMiddleware) for item in specialist["middleware"])
+        assert any(isinstance(item, StateMutationGuardMiddleware) for item in specialist["middleware"])
+        assert not any(isinstance(item, FinalReportCommitMiddleware) for item in specialist["middleware"])
+        assert "specialist_agent" in specialist["system_prompt"] or "Specialist" in specialist["system_prompt"]
     writer_permissions = by_name["writer-agent"]["permissions"]
     assert (
         _check_fs_permission(writer_permissions, "read", "/skills/synthesis/long-form-report-writer/SKILL.md")
@@ -496,7 +524,16 @@ def test_subagents_can_disable_source_router():
     )
 
     by_name = {subagent["name"]: subagent for subagent in subagents}
-    assert set(by_name) == {"planner-agent", "writer-agent"}
+    assert set(by_name) == {
+        "planner-agent",
+        "writer-agent",
+        "platform-architecture-agent",
+        "security-engineering-agent",
+        "implementation-engineering-agent",
+        "ai-model-agent",
+        "evidence-verification-agent",
+        "performance-reliability-agent",
+    }
     assert by_name["planner-agent"]["response_format"] is ResearchPlan
     assert "web_search_tool" in _tool_names(by_name["planner-agent"]["tools"])
     assert _tool_names(by_name["writer-agent"]["tools"]) == ["think", "get_verified_sources"]
