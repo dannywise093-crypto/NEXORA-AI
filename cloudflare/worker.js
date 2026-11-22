@@ -273,7 +273,7 @@ export default {
         serper: { configured: Boolean(env.SERPER_API_KEY), label: "Serper" },
         you: { configured: Boolean(env.YDC_API_KEY), label: "You.com" }
       };
-      const deepResearchReady = Boolean(env.NVIDIA_API_KEY || env.NVIDIA_API_KEY_2) && Object.values(searchProviders).some((item) => item.configured);
+      const deepResearchReady = Boolean(env.NVIDIA_API_KEY || env.NVIDIA_API_KEY_2) && Object.values(searchProviders).every((item) => item.configured);
       return json({ defaultProvider: env.NVIDIA_API_KEY || env.NVIDIA_API_KEY_2 ? "nvidia" : "atlas", providers: {
         atlas: { configured: Boolean(env.AI), label: "Cloudflare Workers AI", role: env.NVIDIA_API_KEY || env.NVIDIA_API_KEY_2 ? "fallback" : "primary" },
         nvidia: { configured: Boolean(env.NVIDIA_API_KEY || env.NVIDIA_API_KEY_2), label: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", role: env.NVIDIA_API_KEY || env.NVIDIA_API_KEY_2 ? "primary" : "not_configured" },
