@@ -204,7 +204,7 @@ function extractAnswer(result) {
 
 function isSimpleIdentityQuestion(prompt = "") {
   const text = String(prompt).trim().toLowerCase();
-  return /^(who are you|what is your name|what's your name|who developed you|who is your developer|who is your creator|who created you|who built you|who made you|what company developed you)[?.!\\s]*$/.test(text);
+  return /^(who are you|what is your name|what's your name|who developed you|who is your developer|who is your creator|who created you|who built you|who made you|what company developed you)[?.!]*$/.test(text);
 }
 
 function classifyAIError(error) {
