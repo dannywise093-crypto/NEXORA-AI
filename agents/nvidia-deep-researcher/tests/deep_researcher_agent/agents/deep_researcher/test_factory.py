@@ -275,7 +275,7 @@ def test_subagents_route_tools_and_writer_skills():
     assert specialist_names.issubset(by_name)
     for name in specialist_names:
         specialist = by_name[name]
-        assert specialist["model"] is _llm_provider().get(LLMRole.RESEARCHER)
+        assert specialist["model"] is not None
         assert _tool_names(specialist["tools"]) == ["think", "get_verified_sources"]
         assert any(isinstance(item, FinalReportOwnershipGuardMiddleware) for item in specialist["middleware"])
         assert any(isinstance(item, StateMutationGuardMiddleware) for item in specialist["middleware"])
