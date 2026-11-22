@@ -2,6 +2,7 @@ import { formatResearchEvidence, needsLiveResearch, searchWeb } from "./knowledg
 import { archiveResearchResults } from "./knowledgeArchive.js";
 import { buildSkillContext, getSkillCatalogStats } from "./skill-orchestrator.js";
 import { checkProviderHealth, formatMultiProviderEvidence, runResearchSearch } from "./provider-integrations.js";
+import { runNexoraAgentTeam } from "./agent-orchestrator.js";
 const MODELS = [
   // Live Workers AI measurement: Llama returned a complete 920-token code answer
   // in ~29 seconds. The previous 9-second deadline guaranteed false timeouts.
@@ -441,6 +442,7 @@ export default {
     // Search is optional and fails closed; timeless prompts do not trigger it.
     let research = { status: "skipped", sources: [], checkedAt: null, archive: { status: env.KNOWLEDGE_DB ? "skipped" : "disabled", storedSources: 0, storedChunks: 0 } };
     let modelMessages = messages;
+    let agentEvidence = "";
     const latestPrompt = messages[messages.length - 1].content;
     const skillInventory = getSkillCatalogStats();
     if (/\b(how many|number of|total|exact)\b.{0,50}\b(skills?|skill catalogue|skill catalog)\b|\b(skills?|skill catalogue|skill catalog)\b.{0,50}\b(how many|total|installed|available)\b/i.test(latestPrompt)) {
@@ -454,9 +456,11 @@ export default {
       });
     }
     const researchMode = body?.researchMode === true && !isCopilot;
+    const agentMode = body?.agentMode === true && !isCopilot;
     if (researchMode) {
       const multiProviderResearch = await runResearchSearch(latestPrompt, env);
       const evidence = formatMultiProviderEvidence(multiProviderResearch);
+      agentEvidence = evidence;
       research = {
         status: multiProviderResearch.status,
         sources: multiProviderResearch.sources,
@@ -471,6 +475,7 @@ export default {
     } else if (needsLiveResearch(latestPrompt)) {
       const searchResult = await searchWeb(latestPrompt);
       const evidence = formatResearchEvidence(searchResult);
+      agentEvidence = evidence.context;
       const archive = await archiveResearchResults(env.KNOWLEDGE_DB, searchResult, evidence.checkedAt);
       research = {
         status: searchResult.status,
@@ -499,6 +504,36 @@ export default {
       + "\n\n" + skillInventoryPrompt
       + (routedSkills.context ? "\n\n" + routedSkills.context : "")
       + (isCuOptTask(latestPrompt) ? "\n\n" + CUOPT_SKILL_PROMPT : "");
+    if (agentMode || researchMode) {
+      try {
+        const teamResult = await runNexoraAgentTeam({
+          prompt: latestPrompt,
+          evidence: agentEvidence,
+          env,
+          mode: researchMode ? "deep_research" : "chief_agent"
+        });
+        const sourceFooter = research.sources.length
+          ? "\n\nSources checked (" + research.checkedAt + "):\n"
+            + research.sources.map((source, index) => (index + 1) + ". [" + (source.provider || "web") + "] " + source.title + " — " + source.url).join("\n")
+            + "\nSearch snippets were retrieved from the listed providers; full source pages were not independently verified."
+          : "";
+        return json({
+          answer: teamResult.answer + sourceFooter,
+          provider: teamResult.provider,
+          model: "nexora-multi-agent",
+          agentMode: true,
+          orchestration: teamResult.orchestration,
+          plan: teamResult.plan,
+          agents: teamResult.agents,
+          fallbackUsed: teamResult.provider !== "NVIDIA API Catalog",
+          research,
+          skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory }
+        });
+      } catch (error) {
+        console.warn("NEXORA agent orchestration unavailable; using standard response path.", String(error?.message || "unknown").slice(0, 160));
+      }
+    }
+
     const failures = [];
     // NVIDIA is the primary model when configured. It receives the same system
     // prompt and routed skill context as the native Workers AI fallback.
