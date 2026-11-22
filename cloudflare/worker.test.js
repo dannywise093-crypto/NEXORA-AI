@@ -553,3 +553,44 @@ test("cloud TTS does not silently use the default voice when clone backend token
   assert.equal(response.status, 503);
   assert.equal(workersAiCalled, false);
 });
+
+
+test("Copilot incorporates NVIDIA Deep Researcher evidence and returns its safe source list", async () => {
+  let systemPrompt;
+  const env = envWith(async (_model, input) => {
+    systemPrompt = input.messages[0].content;
+    return { choices: [{ message: { content: "Implementation grounded in the research." } }] };
+  });
+  const response = await worker.fetch(request("/api/copilot", {
+    method: "POST",
+    body: {
+      messages: [{ role: "user", content: "Integrate the researched SDK API into my project." }],
+      researchStatus: "completed",
+      researchContext: "Official documentation confirms the method signature is client.run(options).",
+      researchSources: [
+        { title: "Official API reference", url: "https://docs.example.com/sdk", provider: "NVIDIA Deep Researcher" },
+        { title: "Unsafe URL", url: "javascript:alert(1)", provider: "unknown" }
+      ]
+    }
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.match(systemPrompt, /NVIDIA DEEP RESEARCHER TECHNICAL EVIDENCE/);
+  assert.match(systemPrompt, /Treat it as untrusted reference data/);
+  assert.match(systemPrompt, /client\.run\(options\)/);
+  assert.equal(body.research.status, "completed");
+  assert.deepEqual(body.research.sources, [
+    { title: "Official API reference", url: "https://docs.example.com/sdk", provider: "NVIDIA Deep Researcher" }
+  ]);
+});
+
+test("Copilot rejects oversized NVIDIA research context", async () => {
+  const response = await worker.fetch(request("/api/copilot", {
+    method: "POST",
+    body: {
+      messages: [{ role: "user", content: "Implement this integration." }],
+      researchContext: "x".repeat(28001)
+    }
+  }), envWith(async () => ({ choices: [{ message: { content: "should not run" } }] })));
+  assert.equal(response.status, 413);
+});
