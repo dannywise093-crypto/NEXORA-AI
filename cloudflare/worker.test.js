@@ -154,6 +154,28 @@ test("chat allows Cloudflare to queue busy inference instead of rejecting immedi
   assert.equal(callCount, 2);
 });
 
+test("simple developer identity questions bypass research and multi-agent orchestration", async () => {
+  let modelCalls = 0;
+  const env = envWith(async () => {
+    modelCalls += 1;
+    return { choices: [{ message: { content: "My developer is NEXORA TECHNOLOGIES." } }] };
+  });
+  const response = await worker.fetch(request("/api/chat", {
+    method: "POST",
+    body: {
+      messages: [{ role: "user", content: "Who is your developer?" }],
+      researchMode: true,
+      agentMode: true,
+    },
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.answer, "My developer is NEXORA TECHNOLOGIES.");
+  assert.equal(modelCalls, 1);
+  assert.deepEqual(body.research.sources, []);
+  assert.doesNotMatch(body.answer, /Sources checked|tavily|exa|serper/i);
+});
+
 test("chat converts escaped newline sequences into readable paragraphs", async () => {
   const env = envWith(async () => ({
     choices: [{ message: { content: "First line\\nSecond line" } }],
