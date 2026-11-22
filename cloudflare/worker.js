@@ -513,9 +513,9 @@ export default {
           mode: researchMode ? "deep_research" : "chief_agent"
         });
         const sourceFooter = research.sources.length
-          ? "\\n\\nSources checked (" + research.checkedAt + "):\\n"
-            + research.sources.map((source, index) => (index + 1) + ". [" + (source.provider || "web") + "] " + source.title + " — " + source.url).join("\\n")
-            + "\\nSearch snippets were retrieved from the listed providers; full source pages were not independently verified."
+          ? "\n\nSources checked (" + research.checkedAt + "):\n"
+            + research.sources.map((source, index) => (index + 1) + ". [" + (source.provider || "web") + "] " + source.title + " — " + source.url).join("\n")
+            + "\nSearch snippets were retrieved from the listed providers; full source pages were not independently verified."
           : "";
         return json({
           answer: teamResult.answer + sourceFooter,
