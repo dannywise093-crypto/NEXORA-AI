@@ -55,8 +55,8 @@ from deep_researcher_agent.agents.deep_researcher.models import ResearchNotes
 from deep_researcher_agent.agents.deep_researcher.models import ResearchPlan
 from deep_researcher_agent.agents.deep_researcher.models import SourceRoutingPlan
 from deep_researcher_agent.agents.deep_researcher.resource_limits import DeepResearchResourceLimits
-from deep_researcher_agent.agents.deep_researcher.specialist_catalog import SPECIALIST_ROLES
 from deep_researcher_agent.agents.deep_researcher.resource_limits import StateBudgetLedger
+from deep_researcher_agent.agents.deep_researcher.specialist_catalog import SPECIALIST_ROLES
 from deep_researcher_agent.common import LLMProvider
 from deep_researcher_agent.common import LLMRole
 
