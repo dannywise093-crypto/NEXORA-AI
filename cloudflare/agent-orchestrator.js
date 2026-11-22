@@ -128,7 +128,7 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
 
   const planner = await callModel(
     env,
-    "You are the NEXORA Chief Agent. Plan exactly three complementary specialist workstreams: Architecture, Security, and Implementation. Return only valid JSON with one top-level tasks array; each task must have id, focus, and question. Do not perform the work or invent evidence.",
+    "You are the NEXORA Chief Agent. Plan exactly six complementary specialist workstreams: Platform Architecture, Security Engineering, Implementation Engineering, AI Model and Agent Engineering, Research and Evidence Verification, and Performance and Reliability Engineering. Return only valid JSON with one top-level tasks array; each task must have id, focus, and question. Do not perform the work or invent evidence.",
     `Task: ${task}\n\nEvidence packet:\n${evidencePacket}\n\nReturn exactly six tasks with ids architecture, security, implementation, ai_models, research_verification, performance.`,
     1000,
     "reasoning"
@@ -147,7 +147,7 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
 
   const writer = await callModel(
     env,
-    "You are the NEXORA Writer Agent. Produce a complete, well-structured technical report from the three specialist findings. Include executive summary, architecture, security, implementation phases, operations/observability, risks, and conclusion. Distinguish source-supported facts from recommendations. Cite only exact URLs in the source manifest; do not invent citations. If evidence is snippet-only, say so. Finish every section and the report; do not leave a heading unfinished.",
+    "You are the NEXORA Writer Agent. Produce a complete, well-structured technical report from all six specialist findings. Include executive summary, architecture, security, implementation phases, operations/observability, risks, and conclusion. Distinguish source-supported facts from recommendations. Cite only exact URLs in the source manifest; do not invent citations. If evidence is snippet-only, say so. Finish every section and the report; do not leave a heading unfinished.",
     `Mode: ${mode}\nUser task: ${task}\n\nSource manifest:\n${JSON.stringify(sourceManifest)}\n\nSpecialist findings:\n${specialistResults.map(item => `## ${item.focus} Specialist\n${item.findings}`).join("\n\n")}\n\nWrite a complete report with a clear conclusion.`,
     5200,
     "reasoning"
@@ -164,6 +164,7 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
   const issues = Array.isArray(review.issues) ? review.issues.map(item => cleanText(String(item), 300)).filter(Boolean).slice(0, 10) : [];
   let finalAnswer = writer.answer;
   let finalProvider = writer.provider;
+  let finalModel = writer.model;
   let reportFinishReason = writer.finishReason;
   let revisionStatus = "not_required";
   if (review.complete === false || issues.length > 0 || writer.finishReason === "length") {
@@ -177,6 +178,7 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
       );
       finalAnswer = revision.answer;
       finalProvider = revision.provider;
+      finalModel = revision.model;
       reportFinishReason = revision.finishReason;
       revisionStatus = "revised";
     } catch {
@@ -188,7 +190,8 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
   return {
     answer: finalAnswer,
     provider: finalProvider,
-    model: writer.model,
+    model: finalModel,
+    planner: { provider: planner.provider, model: planner.model },
     plan: plan.map(({ id, focus }) => ({ id, focus })),
     agents: specialistResults,
     reviewer: {
@@ -201,7 +204,7 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
     },
     sourceAudit,
     orchestration: "completed",
-    modelStrategy: { specialist: "NVIDIA Nemotron 3.5 Lightning 30B A3B (fast profile)", plannerWriterReviewer: "NVIDIA Nemotron 3 Ultra 550B A55B (reasoning profile)", fallback: "Cloudflare Workers AI Llama 3.3 70B Fast" },
+    modelStrategy: { specialistProfile: "fast", reasoningProfile: "reasoning", configuredFallback: FALLBACK_MODEL },
     reportComplete: reportFinishReason !== "length" && !/\b(?:to be continued|continued in next|unfinished section)\b/i.test(finalAnswer) && !finalAnswer.trim().endsWith(":")
   };
 }
