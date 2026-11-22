@@ -102,7 +102,7 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
 
   const planner = await callModel(
     env,
-    "You are the NEXORA Chief Agent. Plan exactly three complementary specialist workstreams: Architecture, Security, and Implementation. Return only valid JSON: {\\"tasks\\":[{\\"id\\":... ,\\"focus\\":... ,\\"question\\":...}]} Do not perform the work or invent evidence.",
+    "You are the NEXORA Chief Agent. Plan exactly three complementary specialist workstreams: Architecture, Security, and Implementation. Return only valid JSON with one top-level tasks array; each task must have id, focus, and question. Do not perform the work or invent evidence.",
     `Task: ${task}\n\nEvidence packet:\n${evidencePacket}\n\nReturn exactly three tasks with ids architecture, security, implementation.`,
     1000
   );
