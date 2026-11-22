@@ -27,7 +27,7 @@ function mockEnvironment({ reviewComplete = true } = {}) {
           }
           if (system.includes("final revision")) return { response: "Complete revised report. Rollback plan included." };
           if (system.includes("Writer Agent")) return { response: "Complete technical report. See https://example.com/source for the source." };
-          return { response: "Specialist findings with risks and recommendations." };
+          return { response: "Assessment for " + system + ". The analysis identifies the primary design constraints, operational assumptions, likely failure modes, and the evidence needed to validate the approach. Recommended actions are to establish explicit acceptance criteria, add focused automated tests, record measurable outcomes, review access boundaries, and document rollback procedures. Remaining uncertainty should be tracked as an open question rather than presented as a verified fact." };
         }
       }
     }
@@ -44,6 +44,9 @@ test("Deterministic plan runs six specialists, Writer and optional Reviewer, the
   });
   assert.equal(result.answer.includes("Complete technical report"), true);
   assert.equal(result.orchestration, "completed");
+  assert.equal(result.executionSummary.completedSpecialists, 6);
+  assert.equal(result.executionSummary.invalidSpecialists, 0);
+  assert.equal(result.agents.every(agent => agent.status === "completed" && agent.durationMs >= 0), true);
   assert.equal(result.plan.length, 6);
   assert.equal(result.agents.length, 6);
   assert.equal(result.reviewer.complete, true);
@@ -86,4 +89,25 @@ test("Source audit flags citations that are not in the retrieved source manifest
   });
   assert.equal(result.sourceAudit.unmatchedCitationCount, 1);
   assert.equal(result.sourceAudit.unmatched[0], "https://not-in-manifest.example/page");
+});
+
+
+test("Acknowledgement-only specialist responses are rejected and reported as partial execution", async () => {
+  const result = await runNexoraAgentTeam({
+    prompt: "Perform a six-discipline architecture and security assessment",
+    env: {
+      AI: {
+        async run(_model, input) {
+          const system = input.messages[0].content;
+          if (system.includes("Reviewer Agent")) return { response: JSON.stringify({ complete: true, issues: [] }) };
+          if (system.includes("Writer Agent")) return { response: "The report is incomplete because specialist outputs failed validation. No specialist findings are asserted as completed." };
+          return { response: "NEXORA CONNECTION TEST SUCCESSFUL" };
+        }
+      }
+    }
+  });
+  assert.equal(result.orchestration, "partial");
+  assert.equal(result.executionSummary.completedSpecialists, 0);
+  assert.equal(result.executionSummary.invalidSpecialists, 6);
+  assert.equal(result.agents.every(agent => agent.status === "invalid_output"), true);
 });
