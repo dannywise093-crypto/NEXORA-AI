@@ -71,6 +71,42 @@ export async function generateAtlasResponse(history, signal, options = {}) {
   return appendSkillUsageNotice(payload.answer.trim(), payload);
 }
 
+async function generateNexoraAgentResponse(history, signal) {
+  const messages = history
+    .filter(item => item && (item.role === "user" || item.role === "atlas" || item.role === "assistant"))
+    .slice(-24)
+    .map(item => ({
+      role: item.role === "atlas" ? "assistant" : item.role,
+      content: String(item.text || "").trim().slice(0, 12000)
+    }))
+    .filter(item => item.content.length > 0);
+  if (!messages.length || messages[messages.length - 1].role !== "user") {
+    throw new Error("Send a task before starting the NEXORA Chief Agent.");
+  }
+  const payload = await requestJson("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, agentMode: true }),
+    signal
+  });
+  if (typeof payload.answer !== "string" || !payload.answer.trim()) {
+    throw new Error("NEXORA Agent System returned an empty report.");
+  }
+  return {
+    answer: payload.answer.trim(),
+    agentRun: {
+      plan: Array.isArray(payload.plan) ? payload.plan : [],
+      agents: Array.isArray(payload.agents) ? payload.agents : [],
+      progress: Array.isArray(payload.progress) ? payload.progress : [],
+      reviewer: payload.reviewer || null,
+      sourceAudit: payload.sourceAudit || null,
+      reportComplete: payload.reportComplete !== false,
+      orchestration: payload.orchestration || "unknown",
+      provider: payload.provider || "configured gateway"
+    }
+  };
+}
+
 export async function generateAtlasCopilotResponse(history, signal) {
   const messages = history
     .filter((item) => item && (item.role === "user" || item.role === "atlas" || item.role === "assistant"))
@@ -100,7 +136,7 @@ export async function generateAtlasCopilotResponse(history, signal) {
 export async function generateProviderResponse(provider, history, signal, options = {}) {
   if (provider === "atlas") return generateAtlasResponse(history, signal, options);
   if (provider === "deep_research") return generateAtlasResponse(history, signal, { ...options, researchMode: true });
-  if (provider === "chief_agent") return generateAtlasResponse(history, signal, { ...options, agentMode: true });
+  if (provider === "chief_agent") return generateNexoraAgentResponse(history, signal);
   if (provider !== "nvidia") throw new Error("This provider adapter is not available in this NEXORA build.");
   const messages = history
     .filter((item) => item && (item.role === "user" || item.role === "atlas" || item.role === "assistant"))
