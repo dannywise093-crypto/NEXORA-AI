@@ -62,7 +62,7 @@ export async function generateAtlasResponse(history, signal, options = {}) {
   const payload = await requestJson("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, voiceMode: options.voiceMode === true, researchMode: options.researchMode === true }),
+    body: JSON.stringify({ messages, voiceMode: options.voiceMode === true, researchMode: options.researchMode === true, agentMode: options.agentMode === true }),
     signal,
   });
   if (typeof payload.answer !== "string" || !payload.answer.trim()) {
@@ -100,6 +100,7 @@ export async function generateAtlasCopilotResponse(history, signal) {
 export async function generateProviderResponse(provider, history, signal, options = {}) {
   if (provider === "atlas") return generateAtlasResponse(history, signal, options);
   if (provider === "deep_research") return generateAtlasResponse(history, signal, { ...options, researchMode: true });
+  if (provider === "chief_agent") return generateAtlasResponse(history, signal, { ...options, agentMode: true });
   if (provider !== "nvidia") throw new Error("This provider adapter is not available in this NEXORA build.");
   const messages = history
     .filter((item) => item && (item.role === "user" || item.role === "atlas" || item.role === "assistant"))
