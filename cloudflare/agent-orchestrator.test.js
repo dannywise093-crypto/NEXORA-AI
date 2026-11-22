@@ -2,6 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runNexoraAgentTeam } from "./agent-orchestrator.js";
 
+
+function mockPageFetch(status = 200, body = "<html><body><h1>Example research source</h1><p>" + "Verified page text with meaningful source details and technical context. ".repeat(5) + "</p></body></html>") {
+  return async () => new Response(body, {
+    status,
+    headers: { "content-type": "text/html; charset=utf-8" }
+  });
+}
+
 function mockEnvironment({ reviewComplete = true } = {}) {
   const calls = [];
   return {
@@ -40,7 +48,8 @@ test("Deterministic plan runs six specialists, Writer and optional Reviewer, the
     prompt: "Design a secure research platform",
     evidence: "Evidence excerpt",
     sources: [{ provider: "test", title: "Example source", url: "https://example.com/source" }],
-    env: mock.env
+    env: mock.env,
+    fetchImpl: mockPageFetch()
   });
   assert.equal(result.answer.includes("Complete technical report"), true);
   assert.equal(result.orchestration, "completed");
@@ -53,7 +62,10 @@ test("Deterministic plan runs six specialists, Writer and optional Reviewer, the
   assert.equal(result.reviewer.revisionStatus, "disabled_for_latency");
   assert.equal(result.sourceAudit.matchedCitationCount, 1);
   assert.equal(result.sourceAudit.unmatchedCitationCount, 0);
-  assert.equal(result.sourceAudit.pageContentsFetched, false);
+  assert.equal(result.sourceAudit.pageContentsFetched, true);
+  assert.equal(result.sourceAudit.verifiedPageCount, 1);
+  assert.equal(result.sourceAudit.verifiedCitationCount, 1);
+  assert.equal(result.sourceVerification.verified, 1);
   assert.equal(mock.calls.length, 8);
 });
 
@@ -71,6 +83,7 @@ test("Source audit flags citations that are not in the retrieved source manifest
   const result = await runNexoraAgentTeam({
     prompt: "Design a platform",
     sources: [{ provider: "test", title: "Allowed", url: "https://example.com/source" }],
+    fetchImpl: mockPageFetch(),
     env: {
       AI: {
         async run(_model, input) {
@@ -110,4 +123,34 @@ test("Acknowledgement-only specialist responses are rejected and reported as par
   assert.equal(result.executionSummary.completedSpecialists, 0);
   assert.equal(result.executionSummary.invalidSpecialists, 6);
   assert.equal(result.agents.every(agent => agent.status === "invalid_output"), true);
+});
+
+
+test("Source page fetch rejects non-HTTPS and does not follow redirects", async () => {
+  const calls = [];
+  const result = await runNexoraAgentTeam({
+    prompt: "Assess source verification controls",
+    sources: [
+      { provider: "test", title: "Insecure", url: "http://example.com/article" },
+      { provider: "test", title: "Redirect", url: "https://example.com/redirect" }
+    ],
+    fetchImpl: async (url, options) => {
+      calls.push({ url, redirect: options.redirect });
+      return new Response("", { status: 302, headers: { location: "https://example.com/final" } });
+    },
+    env: {
+      AI: { async run(_model, input) {
+        const system = input.messages[0].content;
+        if (system.includes("Reviewer Agent")) return { response: JSON.stringify({ complete: true, issues: [] }) };
+        if (system.includes("Writer Agent")) return { response: "Source verification report. No page was verified, and these sources remain unverified." };
+        return { response: "Assessment: the source controls require validation. This report identifies security boundaries, evidence gaps, failure handling, and tests. Recommendations include HTTPS enforcement, redirect review, response-size limits, content-type checks, and explicit citation status. Additional acceptance criteria include bounded request duration and rejection of local network addresses." };
+      }}
+    }
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].redirect, "manual");
+  assert.equal(result.sourceVerification.results[0].fetchStatus, "rejected_url");
+  assert.equal(result.sourceVerification.results[1].fetchStatus, "redirect_not_followed");
+  assert.equal(result.sourceVerification.verified, 0);
+  assert.equal(result.sourceAudit.pageContentsFetched, false);
 });
