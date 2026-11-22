@@ -74,7 +74,7 @@ async function callModel(env, system, prompt, maxTokens = 2400) {
 
 function auditCitations(answer, sources) {
   const allowed = new Set((sources || []).map(source => cleanText(source.url, 1000)).filter(Boolean));
-  const urls = [...new Set((answer.match(/https?:\/\/[^\s)\]>}]+/g) || []).map(url => url.replace(/[.,;]+$/, ""))];
+  const urls = [...new Set((answer.match(/https?:\/\/[^\\s)\\]>}]+/g) || []).map(url => url.replace(/[.,;]+$/, "")))];
   const matched = urls.filter(url => allowed.has(url));
   const unmatched = urls.filter(url => !allowed.has(url));
   return {
