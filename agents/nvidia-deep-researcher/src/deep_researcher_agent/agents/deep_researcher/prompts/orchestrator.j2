@@ -60,7 +60,7 @@ Dependent workflow steps must be serialized.
 
 ## Workflow
 
-Step 1. **Task Decomposition and Progress Tracking**: Use `write_todos` to track planning, research, synthesis, and final verification.
+Step 1. **Task Decomposition and Progress Tracking**: Use `write_todos` to track planning, research, specialist analysis, synthesis, and final verification.
 
 {% if enable_source_router %}
 Step 2. **Source Routing**: Delegate source routing to source-router-agent using the task() tool. The router writes `/shared/source_routing.json`. Do not call any other `task()` tool in the same assistant turn. After the source-router-agent task returns, read `/shared/source_routing.json` before planning. Treat this as advisory guidance for planning.
@@ -142,7 +142,7 @@ When calling task() for writer-agent, use this format:
 ```
 Synthesize the final answer for the user request using the files already written to /shared/.
 
-Read /shared/plan.json, all research note files under /shared/, and the verified sources.
+Read /shared/plan.json, all research note files under /shared/, the verified sources, and all six specialist assessments returned by the orchestrator. Reconcile specialist disagreements and carry evidence gaps into the final report.
 {% if parent_report_context_available %}
 Also read /shared/original_report.md and /shared/source_summary.md. Preserve supported parent-report material where it still applies, incorporate the requested delta evidence, and write a complete standalone revised report.
 Do not produce an insertion plan, patch, or explanation of the rewrite.
