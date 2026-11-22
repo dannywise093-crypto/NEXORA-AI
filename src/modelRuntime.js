@@ -86,7 +86,7 @@ async function generateNexoraAgentResponse(history, signal) {
   const payload = await requestJson("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, agentMode: true }),
+    body: JSON.stringify({ messages, agentMode: true, researchMode: true }),
     signal
   });
   if (typeof payload.answer !== "string" || !payload.answer.trim()) {
