@@ -154,3 +154,36 @@ test("uses a visible BLE identifier instead of the misleading Unknown/Unnamed la
   });
   assert.equal(found[0].name, "BLE device · B2C3D4");
 });
+
+
+test("matches Bluetooth SIG services in both short and canonical 128-bit UUID formats", async () => {
+  for (const serviceUuids of [
+    ["1800", "181a"],
+    ["00001800-0000-1000-8000-00805f9b34fb", "0000181a-0000-1000-8000-00805f9b34fb"],
+    ["00001800-0000-1000-8000-00805F9B34FB", "0000181A-0000-1000-8000-00805F9B34FB"]
+  ]) {
+    const calls = [];
+    const bytes = value => new DataView(new Uint8Array(value).buffer);
+    const fakeBle = {
+      async initialize() {},
+      async isEnabled() { return true; },
+      async connect() {},
+      async getServices() { return serviceUuids.map(uuid => ({ uuid })); },
+      async read(_id, service, characteristic) {
+        calls.push([service, characteristic]);
+        if (characteristic === "2a00") return bytes([78, 111, 100, 101]);
+        if (characteristic === "2a6e") return bytes([0x92, 0x09]);
+        if (characteristic === "2a6f") return bytes([0x10, 0x27]);
+        throw new Error("unexpected characteristic");
+      }
+    };
+    const result = await connectNativeBleSensorDevice({
+      deviceId: "ble-uuid-test",
+      loadBleClient: async () => ({ BleClient: fakeBle }),
+      now: 1000
+    });
+    assert.equal(result.name, "Node");
+    assert.deepEqual(result.sensors.map(sensor => sensor.sensorId), ["temperature", "humidity"]);
+    assert.deepEqual(calls, [["1800", "2a00"], ["181a", "2a6e"], ["181a", "2a6f"]]);
+  }
+});
