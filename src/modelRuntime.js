@@ -68,7 +68,11 @@ export async function generateAtlasResponse(history, signal, options = {}) {
   if (typeof payload.answer !== "string" || !payload.answer.trim()) {
     throw new Error("The configured model returned an empty response.");
   }
-  return appendSkillUsageNotice(payload.answer.trim(), payload);
+  return {
+    answer: appendSkillUsageNotice(payload.answer.trim(), payload),
+    sources: Array.isArray(payload.research?.sources) ? payload.research.sources : [],
+    research: payload.research || null,
+  };
 }
 
 async function generateNexoraAgentResponse(history, signal) {
@@ -102,7 +106,9 @@ async function generateNexoraAgentResponse(history, signal) {
       sourceAudit: payload.sourceAudit || null,
       reportComplete: payload.reportComplete !== false,
       orchestration: payload.orchestration || "unknown",
-      provider: payload.provider || "configured gateway"
+      provider: payload.provider || "configured gateway",
+      sources: Array.isArray(payload.research?.sources) ? payload.research.sources : [],
+      research: payload.research || null
     }
   };
 }
