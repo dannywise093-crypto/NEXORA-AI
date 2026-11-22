@@ -521,6 +521,71 @@ def build_deep_research_subagents(context: DeepResearchGraphContext) -> list[dic
             response_format=ResearchPlan,
         )
     )
+    # Preserve the six cross-cutting reviewers that complement the 200 domain roles.
+    core_specialists = [
+        (
+            "platform-architecture-agent",
+            "Platform Architecture Specialist",
+            "Analyze system boundaries, architecture, integrations, scalability, data flows, and operational design.",
+            "Architecture and system design",
+        ),
+        (
+            "security-engineering-agent",
+            "Security Engineering Specialist",
+            "Analyze threat models, identity, access controls, privacy, prompt injection, supply-chain risk, and mitigations.",
+            "Security, privacy, and threat analysis",
+        ),
+        (
+            "implementation-engineering-agent",
+            "Implementation Engineering Specialist",
+            "Translate findings into implementation phases, interfaces, dependencies, tests, deployment, and rollback plans.",
+            "Implementation planning and verification",
+        ),
+        (
+            "ai-model-agent",
+            "AI Model and Agent Engineering Specialist",
+            "Analyze model choices, inference, agent boundaries, tool calling, context management, and evaluation.",
+            "AI models, agent design, and evaluation",
+        ),
+        (
+            "evidence-verification-agent",
+            "Research and Evidence Verification Specialist",
+            "Audit source quality, unsupported claims, conflicts, stale sources, missing primary sources, and uncertainty.",
+            "Evidence quality, citations, and uncertainty",
+        ),
+        (
+            "performance-reliability-agent",
+            "Performance and Reliability Specialist",
+            "Analyze latency, throughput, concurrency, timeouts, retries, resource limits, and failure modes.",
+            "Performance, operations, and reliability",
+        ),
+    ]
+    for name, description, mandate, focus in core_specialists:
+        subagents.append(
+            _subagent_spec(
+                context,
+                name=name,
+                description=description,
+                prompt_name="specialist_agent",
+                role=LLMRole.RESEARCHER,
+                tools=context.tool_set.helper_tools,
+                middleware=[
+                    *context.middleware_set.researcher,
+                    FinalReportOwnershipGuardMiddleware(),
+                    StateMutationGuardMiddleware(
+                        writer=False,
+                        sandbox_enabled=context.runtime.execution_enabled,
+                    ),
+                    TodoSuppressionMiddleware(),
+                ],
+                prompt_values={
+                    "specialist_name": description,
+                    "specialist_mandate": mandate,
+                    "specialist_focus": focus,
+                },
+            )
+        )
+
     # Register all 200 NEXORA specialist profiles as native DeepAgents subagents.
     # They share the configured NVIDIA researcher model and helper tools, and are
     # invoked selectively by the orchestrator rather than all being run per query.
