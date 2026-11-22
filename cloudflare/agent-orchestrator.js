@@ -134,6 +134,7 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
   const issues = Array.isArray(review.issues) ? review.issues.map(item => cleanText(String(item), 300)).filter(Boolean).slice(0, 10) : [];
   let finalAnswer = writer.answer;
   let finalProvider = writer.provider;
+  let reportFinishReason = writer.finishReason;
   let revisionStatus = "not_required";
   if (review.complete === false || issues.length > 0 || writer.finishReason === "length") {
     try {
@@ -145,6 +146,7 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
       );
       finalAnswer = revision.answer;
       finalProvider = revision.provider;
+      reportFinishReason = revision.finishReason;
       revisionStatus = "revised";
     } catch {
       revisionStatus = "revision_unavailable";
