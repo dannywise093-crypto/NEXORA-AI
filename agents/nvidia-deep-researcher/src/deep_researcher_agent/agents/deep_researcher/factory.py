@@ -74,6 +74,7 @@ from .models import ResearchPlan
 from .models import SourceRoutingPlan
 from .resource_limits import DeepResearchResourceLimits
 from .resource_limits import StateBudgetLedger
+from .specialist_catalog import SPECIALIST_ROLES
 from .tools.research import build_research_batch_tool
 from .tools.source_registry import build_get_verified_sources_tool
 from .tools.source_routing import build_lookup_source_catalog_tool
@@ -167,6 +168,7 @@ class DeepResearchGraphContext:
         """Render a named prompt template with shared context plus any overrides."""
         prompt_values = {
             "current_datetime": self.current_datetime,
+            "specialist_catalog": SPECIALIST_ROLES,
             "user_info": self.state.user_info,
             "available_documents": self.available_documents,
             "execution_enabled": self.runtime.execution_enabled,
@@ -519,48 +521,49 @@ def build_deep_research_subagents(context: DeepResearchGraphContext) -> list[dic
             response_format=ResearchPlan,
         )
     )
-    # Domain specialists are native NVIDIA Deep Research subagents. They analyze
-    # the research evidence already collected by the workflow; they do not launch
-    # duplicate searches or write the final report.
-    specialist_specs = [
+    # Preserve the six cross-cutting reviewers that complement the 200 domain roles.
+    core_specialists = [
         (
             "platform-architecture-agent",
             "Platform Architecture Specialist",
-            "Analyze system boundaries, architecture, integrations, scalability, data flows, and operational design. Identify trade-offs and distinguish evidence from recommendations.",
+            "Analyze system boundaries, architecture, integrations, scalability, data flows, and operational design.",
             "Architecture and system design",
         ),
         (
             "security-engineering-agent",
             "Security Engineering Specialist",
-            "Analyze the threat model, identity and access controls, data protection, prompt injection, supply-chain risk, privacy, abuse cases, and mitigations. Never claim a control exists unless the evidence shows it.",
+            "Analyze threat models, identity, access controls, privacy, prompt injection, supply-chain risk, "
+            "and mitigations.",
             "Security, privacy, and threat analysis",
         ),
         (
             "implementation-engineering-agent",
             "Implementation Engineering Specialist",
-            "Translate the research plan into practical implementation phases, interfaces, dependencies, test strategy, deployment sequence, and rollback considerations. Separate verified existing capabilities from proposed work.",
+            "Translate findings into implementation phases, interfaces, dependencies, tests, deployment, "
+            "and rollback plans.",
             "Implementation planning and verification",
         ),
         (
             "ai-model-agent",
             "AI Model and Agent Engineering Specialist",
-            "Analyze model choices, inference providers, agent boundaries, tool calling, context management, evaluation, reliability, and model-routing trade-offs. Do not claim benchmark superiority without benchmark evidence.",
+            "Analyze model choices, inference, agent boundaries, tool calling, context management, and evaluation.",
             "AI models, agent design, and evaluation",
         ),
         (
             "evidence-verification-agent",
             "Research and Evidence Verification Specialist",
-            "Audit the collected research notes and verified source registry. Identify unsupported statements, conflicting evidence, stale sources, missing primary sources, and confidence limits. Do not invent sources or citations.",
+            "Audit source quality, unsupported claims, conflicts, stale sources, missing primary sources, "
+            "and uncertainty.",
             "Evidence quality, citations, and uncertainty",
         ),
         (
             "performance-reliability-agent",
-            "Performance and Reliability Engineering Specialist",
-            "Analyze latency, throughput, concurrency, timeouts, retries, resource limits, observability, failure modes, and graceful degradation. Quantify only where evidence supports it.",
+            "Performance and Reliability Specialist",
+            "Analyze latency, throughput, concurrency, timeouts, retries, resource limits, and failure modes.",
             "Performance, operations, and reliability",
         ),
     ]
-    for name, description, mandate, focus in specialist_specs:
+    for name, description, mandate, focus in core_specialists:
         subagents.append(
             _subagent_spec(
                 context,
@@ -578,7 +581,40 @@ def build_deep_research_subagents(context: DeepResearchGraphContext) -> list[dic
                     ),
                     TodoSuppressionMiddleware(),
                 ],
-                prompt_values={"specialist_name": description, "specialist_mandate": mandate, "specialist_focus": focus},
+                prompt_values={
+                    "specialist_name": description,
+                    "specialist_mandate": mandate,
+                    "specialist_focus": focus,
+                },
+            )
+        )
+
+    # Register all 200 NEXORA specialist profiles as native DeepAgents subagents.
+    # They share the configured NVIDIA researcher model and helper tools, and are
+    # invoked selectively by the orchestrator rather than all being run per query.
+    for specialist in SPECIALIST_ROLES:
+        subagents.append(
+            _subagent_spec(
+                context,
+                name=specialist["agent_name"],
+                description=f'{specialist["name"]} ({specialist["division"]}): {specialist["focus"]}.',
+                prompt_name="specialist_agent",
+                role=LLMRole.RESEARCHER,
+                tools=context.tool_set.helper_tools,
+                middleware=[
+                    *context.middleware_set.researcher,
+                    FinalReportOwnershipGuardMiddleware(),
+                    StateMutationGuardMiddleware(
+                        writer=False,
+                        sandbox_enabled=context.runtime.execution_enabled,
+                    ),
+                    TodoSuppressionMiddleware(),
+                ],
+                prompt_values={
+                    "specialist_name": specialist["name"],
+                    "specialist_mandate": specialist["mandate"],
+                    "specialist_focus": specialist["division"],
+                },
             )
         )
 

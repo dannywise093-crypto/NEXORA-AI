@@ -56,6 +56,7 @@ from deep_researcher_agent.agents.deep_researcher.models import ResearchPlan
 from deep_researcher_agent.agents.deep_researcher.models import SourceRoutingPlan
 from deep_researcher_agent.agents.deep_researcher.resource_limits import DeepResearchResourceLimits
 from deep_researcher_agent.agents.deep_researcher.resource_limits import StateBudgetLedger
+from deep_researcher_agent.agents.deep_researcher.specialist_catalog import SPECIALIST_ROLES
 from deep_researcher_agent.common import LLMProvider
 from deep_researcher_agent.common import LLMRole
 
@@ -598,3 +599,20 @@ def test_researcher_runnable_uses_rendered_prompt_and_runtime_middleware():
     assert "ToolVisibilityMiddleware" in middleware_names
     assert kwargs["middleware"][-2] is shared_middleware[0]
     assert middleware_names[0] == "NemoRelayMiddleware"
+
+
+def test_nexora_registers_all_200_unique_specialist_roles():
+    """Every planned NEXORA specialist role is available exactly once."""
+    assert len(SPECIALIST_ROLES) == 200
+    assert len({role["id"] for role in SPECIALIST_ROLES}) == 200
+    assert len({role["agent_name"] for role in SPECIALIST_ROLES}) == 200
+    assert all(role["division"] and role["mandate"] and role["focus"] for role in SPECIALIST_ROLES)
+
+
+def test_deep_research_subagents_include_all_nexora_specialists():
+    """The graph exposes every NEXORA specialist as a native subagent."""
+    context = _graph_context()
+    subagents = build_deep_research_subagents(context)
+    names = {agent["name"] for agent in subagents}
+    assert all(role["agent_name"] in names for role in SPECIALIST_ROLES)
+    assert sum(name.startswith("nexora-") for name in names) == 200
