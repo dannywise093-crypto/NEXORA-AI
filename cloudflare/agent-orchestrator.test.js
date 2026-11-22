@@ -56,7 +56,7 @@ test("Chief Agent runs six specialists, Writer and Reviewer, then audits citatio
 
 test("Reviewer findings trigger one full-report revision", async () => {
   const mock = mockEnvironment({ reviewComplete: false });
-  const result = await runNexoraAgentTeam({ prompt: "Plan a deployment", env: mock.env });
+  const result = await runNexoraAgentTeam({ prompt: "Create a comprehensive deployment architecture and implementation plan", env: mock.env });
   assert.equal(result.reviewer.complete, false);
   assert.equal(result.reviewer.revisionStatus, "revised");
   assert.equal(result.answer, "Complete revised report. Rollback plan included.");
@@ -86,4 +86,17 @@ test("Source audit flags citations that are not in the retrieved source manifest
   });
   assert.equal(result.sourceAudit.unmatchedCitationCount, 1);
   assert.equal(result.sourceAudit.unmatched[0], "https://not-in-manifest.example/page");
+});
+
+test("Everyday Chief Agent chat uses one fast model call instead of the full agent chain", async () => {
+  const mock = mockEnvironment();
+  const result = await runNexoraAgentTeam({
+    prompt: "Hello NEXORA, how are you?",
+    env: mock.env
+  });
+  assert.equal(result.orchestration, "quick_response");
+  assert.equal(result.plan.length, 0);
+  assert.equal(result.agents.length, 0);
+  assert.equal(result.reviewer.status, "skipped_for_fast_reply");
+  assert.equal(mock.calls.length, 1);
 });
