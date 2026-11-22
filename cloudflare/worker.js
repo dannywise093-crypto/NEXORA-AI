@@ -178,6 +178,16 @@ function isTruncated(result) {
   return finishReason === "length" || finishReason === "max_tokens";
 }
 
+function normalizeAnswerText(value) {
+  // Convert escaped newline sequences from upstream models into real line breaks.
+  return String(value || "")
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\n")
+    .replace(/\r\n/g, "\n")
+    .trim();
+}
+
 function extractAnswer(result) {
   // Accept both OpenAI chat-completion and native Workers AI text outputs.
   const candidates = [
@@ -187,9 +197,14 @@ function extractAnswer(result) {
     result?.output_text,
   ];
   for (const value of candidates) {
-    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "string" && value.trim()) return normalizeAnswerText(value);
   }
   return "";
+}
+
+function isSimpleIdentityQuestion(prompt = "") {
+  const text = String(prompt).trim().toLowerCase();
+  return /^(who are you|what is your name|what's your name|who developed you|who is your developer|who is your creator|who created you|who built you|who made you|what company developed you)[?.!\\s]*$/.test(text);
 }
 
 function classifyAIError(error) {
@@ -457,7 +472,8 @@ export default {
     }
     const researchMode = body?.researchMode === true && !isCopilot;
     const agentMode = body?.agentMode === true && !isCopilot;
-    if (researchMode) {
+    const simpleIdentityQuestion = isSimpleIdentityQuestion(latestPrompt);
+    if (researchMode && !simpleIdentityQuestion) {
       const multiProviderResearch = await runResearchSearch(latestPrompt, env);
       const evidence = formatMultiProviderEvidence(multiProviderResearch);
       agentEvidence = evidence;
@@ -472,7 +488,7 @@ export default {
         ...messages.slice(0, -1),
         { role: "user", content: latestPrompt + "\n\n" + evidence },
       ];
-    } else if (needsLiveResearch(latestPrompt)) {
+    } else if (!simpleIdentityQuestion && needsLiveResearch(latestPrompt)) {
       const searchResult = await searchWeb(latestPrompt);
       const evidence = formatResearchEvidence(searchResult);
       agentEvidence = evidence.context;
@@ -513,13 +529,8 @@ export default {
           env,
           mode: researchMode ? "deep_research" : "chief_agent"
         });
-        const sourceFooter = research.sources.length
-          ? "\n\nSources checked (" + research.checkedAt + "):\n"
-            + research.sources.map((source, index) => (index + 1) + ". [" + (source.provider || "web") + "] " + source.title + " — " + source.url).join("\n")
-            + "\nSearch snippets were retrieved from the listed providers; full source pages were not independently verified."
-          : "";
         return json({
-          answer: teamResult.answer + sourceFooter,
+          answer: normalizeAnswerText(teamResult.answer),
           provider: teamResult.provider,
           model: "nexora-multi-agent",
           agentMode: true,
@@ -569,13 +580,7 @@ export default {
         if (upstream.ok) {
           const answer = extractAnswer(result);
           if (answer) {
-            const sourceFooter = research.sources.length
-              ? "\\n\\nSources checked (" + research.checkedAt + "):\\n" + research.sources.map((source, index) => (index + 1) + ". [" + (source.provider || "web") + "] " + source.title + " — " + source.url).join("\\n")
-                + "\\nSearch snippets were retrieved from the listed providers; full source pages were not independently verified."
-              : research.status === "unavailable" || research.status === "no_results"
-                ? "\\n\\nLive research could not provide usable sources. Current claims have not been independently verified."
-                : "";
-            return json({ answer: answer.trim() + sourceFooter, provider: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", nvidiaKeySlot: keyIndex === 0 ? "primary" : "backup", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory } });
+            return json({ answer: normalizeAnswerText(answer), provider: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", nvidiaKeySlot: keyIndex === 0 ? "primary" : "backup", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory } });
           }
           failures.push({ provider: keyIndex === 0 ? "nvidia" : "nvidia_backup", status: "empty_response", durationMs: Date.now() - startedAt });
         } else {
@@ -599,15 +604,8 @@ export default {
         }
         const answer = extractAnswer(result);
         if (answer) {
-          const sourceFooter = research.sources.length
-            ? "\n\nSources checked (" + research.checkedAt + "):\n"
-              + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\n")
-              + "\nThese are search-result snippets; full source pages were not independently verified."
-            : research.status === "unavailable" || research.status === "no_results"
-              ? "\n\nLive web research could not provide usable sources for this request. Current facts have not been independently verified."
-              : "";
           return json({
-            answer: answer.trim() + sourceFooter,
+            answer: normalizeAnswerText(answer),
             model: model.id,
             fallbackUsed: model.id !== MODELS[0].id,
             research,
