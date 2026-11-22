@@ -418,7 +418,7 @@ test("Cloudflare transcription endpoint sends uploaded audio to Whisper and retu
   form.append("audio", new Blob([new Uint8Array(512).fill(7)], { type: "audio/webm" }), "voice.webm");
   const response = await worker.fetch(new Request("https://atlas.test/api/transcribe", {
     method: "POST",
-    headers: { authorization: "Bearer " + token },
+    headers: { authorization: "Bearer " + token, "cf-connecting-ip": "192.0.2.150" },
     body: form
   }), env);
   const body = await response.json();
