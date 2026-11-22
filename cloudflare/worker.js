@@ -2,6 +2,7 @@ import { formatResearchEvidence, needsLiveResearch, searchWeb } from "./knowledg
 import { archiveResearchResults } from "./knowledgeArchive.js";
 import { buildSkillContext, getSkillCatalogStats } from "./skill-orchestrator.js";
 import { checkProviderHealth, formatMultiProviderEvidence, runResearchSearch } from "./provider-integrations.js";
+import { NexoraBrowserSession } from "./browser-agent.js";
 const MODELS = [
   // Live Workers AI measurement: Llama returned a complete 920-token code answer
   // in ~29 seconds. The previous 9-second deadline guaranteed false timeouts.
@@ -246,6 +247,17 @@ export default {
     // The private Pages-to-Worker token protects the gateway. End users do
     // not need Google accounts or browser sign-in sessions.
     if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+    if (url.pathname === "/api/browser") {
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
+      if (rateLimited(request)) return json({ error: "Browser request limit reached. Please wait before trying again." }, 429, { "retry-after": "60" });
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "A valid JSON body is required." }, 400); }
+      const ownerId = String(body?.ownerId || "");
+      if (!/^[a-f0-9-]{36}$/i.test(ownerId)) return json({ error: "A valid browser session owner ID is required." }, 400);
+      const id = env.NEXORA_BROWSER.idFromName(ownerId);
+      const stub = env.NEXORA_BROWSER.get(id);
+      return stub.fetch("https://browser-session.internal/action", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    }
     if (url.pathname === "/api/health") {
       if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
@@ -586,3 +598,6 @@ export default {
     }, 503, { "retry-after": "3" });
   },
 };
+
+
+export { NexoraBrowserSession };
