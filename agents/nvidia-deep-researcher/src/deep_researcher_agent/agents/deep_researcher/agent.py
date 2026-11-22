@@ -185,7 +185,7 @@ class DeepResearcherAgent:
     def _load_prompts(self) -> dict[str, str]:
         """Load all prompts for subagents."""
         prompts = {}
-        prompt_names = ["planner", "researcher", "orchestrator", "writer", "source_router"]
+        prompt_names = ["planner", "researcher", "orchestrator", "writer", "source_router", "specialist_agent"]
 
         for name in prompt_names:
             prompts[name] = load_prompt(AGENT_DIR / "prompts", name)
