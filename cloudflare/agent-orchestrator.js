@@ -165,6 +165,6 @@ export async function runNexoraAgentTeam({ prompt, evidence = "", sources = [], 
     },
     sourceAudit,
     orchestration: "completed",
-    reportComplete: !/\\b(?:to be continued|continued in next|unfinished section)\\b/i.test(finalAnswer) && !finalAnswer.trim().endsWith(":")
+    reportComplete: !/\b(?:to be continued|continued in next|unfinished section)\b/i.test(finalAnswer) && !finalAnswer.trim().endsWith(":")
   };
 }
