@@ -306,3 +306,17 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
 .copilot-output-heading{display:flex;justify-content:space-between;padding:9px 11px;background:#101b2b;color:#9cb8df;font-size:9px;font-weight:800;letter-spacing:1px}.copilot-run-output.complete .copilot-output-heading{color:#75d7ad}.copilot-run-output.error .copilot-output-heading,.copilot-run-output.timeout .copilot-output-heading{color:#f19ba5}
 .copilot-run-output pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:300px;overflow:auto;margin:0;padding:12px;color:#d5e2f4;font:11px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace}
 .copilot-runtime-note,.copilot-code-unsupported{display:block;margin-top:9px;color:#8293ad;font-size:9px;line-height:1.5}.copilot-code-unsupported{padding:9px;border-radius:7px;background:#101b2b}
+
+/* NEXORA Agent Control Center */
+.nexora-agent-control{display:grid;gap:12px;margin-top:14px;padding:14px;border:1px solid #314967;border-radius:14px;background:linear-gradient(145deg,#0c1929,#0b1220);color:#dbe8fa;min-width:0}
+.nexora-agent-control>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.nexora-agent-control>header div{display:grid;gap:4px}.nexora-agent-control>header b{font-size:10px;letter-spacing:1.2px;color:#9ec8ff}.nexora-agent-control>header small,.nexora-agent-control footer{font-size:9px;color:#8499b7}
+.agent-quality-good,.agent-quality-warning{padding:6px 9px;border-radius:20px;font-size:9px;font-weight:800}.agent-quality-good{background:#123d32;color:#8be0bd}.agent-quality-warning{background:#49331b;color:#ffd28a}
+.nexora-agent-progress{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.nexora-agent-step{display:grid;grid-template-columns:9px minmax(0,1fr) auto;align-items:center;gap:7px;padding:9px;border:1px solid #263b55;border-radius:9px;background:#101f32;font-size:10px}
+.nexora-agent-step>b{font-size:9px;color:#91c6ad}.agent-step-dot{width:7px;height:7px;border-radius:50%;background:#e4b66a}.agent-step-dot.done{background:#55d6a0;box-shadow:0 0 8px #55d6a077}
+.nexora-agent-details{border:1px solid #263b55;border-radius:9px;background:#0c1726;padding:10px}.nexora-agent-details summary{cursor:pointer;color:#bcd6f7;font-size:10px;font-weight:700}.nexora-agent-finding{padding:12px 0;border-bottom:1px solid #26364a}.nexora-agent-finding:last-child{border-bottom:0}.nexora-agent-finding>b,.nexora-agent-review>b{font-size:11px;color:#a8d0ff}.nexora-agent-finding p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.6;color:#d2dced}.nexora-agent-finding small{color:#8093ad;font-size:9px}
+.nexora-agent-review{display:grid;gap:6px;padding:10px;border:1px solid #315c50;border-radius:9px;background:#0c2924;font-size:10px}.nexora-agent-review span{color:#9bc6b7}.nexora-agent-review ul,.nexora-agent-details ul{margin:0;padding-left:18px;color:#edc88c;font-size:10px;line-height:1.6;overflow-wrap:anywhere}
+.agent-audit-counts{display:flex;gap:7px;flex-wrap:wrap}.agent-audit-counts span{padding:6px 8px;border:1px solid #293f5a;border-radius:7px;color:#b7cbe4;font-size:9px}
+.nexora-agent-control footer{padding-top:3px}
+@media(max-width:520px){.nexora-agent-progress{grid-template-columns:1fr}.nexora-agent-step{font-size:10px}.nexora-agent-control{padding:11px}}
