@@ -527,6 +527,7 @@ export default {
           plan: teamResult.plan,
           agents: teamResult.agents,
           reviewer: teamResult.reviewer,
+          executionSummary: teamResult.executionSummary,
           sourceAudit: teamResult.sourceAudit,
           reportComplete: teamResult.reportComplete,
           progress: [
