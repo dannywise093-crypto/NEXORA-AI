@@ -57,11 +57,11 @@ from .custom_middleware import RequiredOutputFileMiddleware
 from .custom_middleware import RequiredWriterDelegationMiddleware
 from .custom_middleware import ResearcherFinalizationMiddleware
 from .custom_middleware import SourceRegistryMiddleware
-from .custom_middleware import SubagentDelegationLimitMiddleware
 from .custom_middleware import SourceRoutingGuardMiddleware
 from .custom_middleware import SourceRoutingPersistenceMiddleware
 from .custom_middleware import StateMutationGuardMiddleware
 from .custom_middleware import StructuredResponseTextFallbackMiddleware
+from .custom_middleware import SubagentDelegationLimitMiddleware
 from .custom_middleware import TodoQuotaMiddleware
 from .custom_middleware import TodoSuppressionMiddleware
 from .custom_middleware import ToolNameSanitizationMiddleware
