@@ -57,6 +57,7 @@ from .custom_middleware import RequiredOutputFileMiddleware
 from .custom_middleware import RequiredWriterDelegationMiddleware
 from .custom_middleware import ResearcherFinalizationMiddleware
 from .custom_middleware import SourceRegistryMiddleware
+from .custom_middleware import SubagentDelegationLimitMiddleware
 from .custom_middleware import SourceRoutingGuardMiddleware
 from .custom_middleware import SourceRoutingPersistenceMiddleware
 from .custom_middleware import StateMutationGuardMiddleware
@@ -782,6 +783,7 @@ def build_deep_research_graph(
                         ),
                         TodoQuotaMiddleware(resource_limits=context.resource_limits),
                         RequiredWriterDelegationMiddleware(tracker=context.final_report_tracker),
+                        SubagentDelegationLimitMiddleware(),
                     ]
                 ),
                 permissions=context.permissions(ORCHESTRATOR_AGENT),
