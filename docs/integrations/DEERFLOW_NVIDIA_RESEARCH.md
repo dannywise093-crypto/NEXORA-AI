@@ -84,3 +84,24 @@ NEXORA already has a separate NVIDIA Deep Research backend and a 200-role specia
 ## Current status
 
 This change adds a pinned, inspectable upstream source reference and this integration guide only. It does **not** claim that DeerFlow has been merged into the NVIDIA runtime, that the backend is deployed, or that the combined system is production-ready.
+
+
+## First runtime capability adopted
+
+The NVIDIA orchestrator now uses a small NEXORA-owned middleware inspired by
+DeerFlow's subagent-limit middleware. It enforces both a per-response parallel
+limit (10 task calls) and a per-run total (13 task calls). The run total reserves
+capacity for source routing, planning, and writer publication while preserving
+the existing prompt policy of normally selecting 2–6 specialists and at most 10
+for genuinely broad work. Excess calls are removed before dispatch; the
+orchestrator receives a bounded note and can continue with the results already
+collected. The counter is derived from the current run's message history, so it
+does not create a second job store or alter NVIDIA's async job persistence.
+
+Other high-value DeerFlow concepts are already represented in the NVIDIA
+backend: native specialist subagents, skills middleware, sandbox isolation,
+artifact harvesting, async job events, report follow-up, MCP sources, and
+resource limits. Avoid adding duplicate frameworks for those capabilities.
+Long-term user/project memory is a separate follow-up because it needs explicit
+owner/thread scoping, retention controls, and encrypted persistence; it must not
+be implemented by sharing an in-memory store across users or jobs.
