@@ -2,13 +2,14 @@ const MAX_BODY_BYTES = 40 * 1024;
 const MCP_PROTOCOL_VERSION = "2025-11-25";
 const GATEWAY_URL = "https://atlas-model-gateway.dannywise093.workers.dev/api/chat";
 
-function json(body, status = 200) {
+function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff"
+      "X-Content-Type-Options": "nosniff",
+      ...extraHeaders
     }
   });
 }
