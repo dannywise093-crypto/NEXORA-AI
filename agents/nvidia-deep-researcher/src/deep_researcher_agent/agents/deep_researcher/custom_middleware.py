@@ -1550,3 +1550,152 @@ class ToolResultPruningMiddleware(AgentMiddleware):
                 pruned_messages.append(msg)
 
         return await handler(request.override(messages=pruned_messages))
+
+# DeerFlow-inspired hard guard for specialist delegation. The prompt recommends
+# 2-6 specialists (10 for broad work); this middleware makes the upper bound
+# enforceable instead of relying on model compliance alone.
+MAX_CONCURRENT_SUBAGENT_CALLS = 10
+# Reserve room for source routing, planning, and final writing in one run.
+MAX_TOTAL_SUBAGENT_CALLS = 13
+_SUBAGENT_LIMIT_NOTE = (
+    "[NEXORA DELEGATION LIMIT] Excess task calls in this response were withheld. "
+    "Use the results already collected, avoid repeating completed work, and continue "
+    "with the remaining workflow. The hard run limit includes routing, planning, "
+    "specialist assessments, and writing."
+)
+
+
+class SubagentDelegationLimitMiddleware(AgentMiddleware):
+    """Enforce bounded parallel and total task() delegations per research run.
+
+    The complete message history is scoped to one DeepResearcherAgent invocation,
+    so it provides a run-local delegation ledger without introducing another
+    database or changing the NVIDIA job store.
+    """
+
+    def __init__(
+        self,
+        *,
+        max_concurrent: int = MAX_CONCURRENT_SUBAGENT_CALLS,
+        max_total: int = MAX_TOTAL_SUBAGENT_CALLS,
+    ) -> None:
+        if not isinstance(max_concurrent, int) or isinstance(max_concurrent, bool):
+            raise ValueError("max_concurrent must be an integer")
+        if not isinstance(max_total, int) or isinstance(max_total, bool):
+            raise ValueError("max_total must be an integer")
+        if not 1 <= max_concurrent <= MAX_CONCURRENT_SUBAGENT_CALLS:
+            raise ValueError(f"max_concurrent must be between 1 and {MAX_CONCURRENT_SUBAGENT_CALLS}")
+        if not 1 <= max_total <= MAX_TOTAL_SUBAGENT_CALLS:
+            raise ValueError(f"max_total must be between 1 and {MAX_TOTAL_SUBAGENT_CALLS}")
+        self.max_concurrent = max_concurrent
+        self.max_total = max_total
+
+    @staticmethod
+    def _messages(state: object) -> list[object]:
+        messages = state.get("messages", []) if isinstance(state, dict) else getattr(state, "messages", [])
+        return messages if isinstance(messages, list) else []
+
+    @staticmethod
+    def _prior_task_count(messages: list[object]) -> int:
+        """Count unique task calls in earlier model messages."""
+        seen: set[tuple[str, str]] = set()
+        for message_index, message in enumerate(messages):
+            if not isinstance(message, AIMessage):
+                continue
+            message_id = getattr(message, "id", None) or f"message:{message_index}"
+            for call_index, call in enumerate(message.tool_calls or []):
+                if not isinstance(call, dict) or call.get("name") != "task":
+                    continue
+                call_id = call.get("id") or f"call:{call_index}"
+                seen.add((str(message_id), str(call_id)))
+        return len(seen)
+
+    @staticmethod
+    def _clone_with_calls(message: AIMessage, tool_calls: list[dict[str, Any]], note: str) -> AIMessage:
+        """Keep normalized and provider-raw tool-call payloads in sync."""
+        kept_ids = {
+            str(call["id"])
+            for call in tool_calls
+            if isinstance(call, dict) and isinstance(call.get("id"), str) and call.get("id")
+        }
+        additional_kwargs = dict(message.additional_kwargs or {})
+        raw_calls = additional_kwargs.get("tool_calls")
+        if isinstance(raw_calls, list):
+            filtered_raw = [
+                raw_call
+                for raw_call in raw_calls
+                if isinstance(raw_call, dict) and str(raw_call.get("id") or "") in kept_ids
+            ]
+            if filtered_raw:
+                additional_kwargs["tool_calls"] = filtered_raw
+            else:
+                additional_kwargs.pop("tool_calls", None)
+        if not tool_calls:
+            additional_kwargs.pop("function_call", None)
+
+        content = message.content
+        if isinstance(content, str):
+            content = f"{content}\n\n{note}" if content else note
+        elif isinstance(content, list):
+            content = [*content, {"type": "text", "text": note}]
+        else:
+            content = f"{content}\n\n{note}"
+
+        response_metadata = dict(message.response_metadata or {})
+        if not tool_calls and response_metadata.get("finish_reason") == "tool_calls":
+            response_metadata["finish_reason"] = "stop"
+
+        return message.model_copy(
+            update={
+                "tool_calls": tool_calls,
+                "additional_kwargs": additional_kwargs,
+                "content": content,
+                "response_metadata": response_metadata,
+            }
+        )
+
+    def _enforce(self, state: object) -> dict[str, object] | None:
+        messages = self._messages(state)
+        if not messages or not isinstance(messages[-1], AIMessage):
+            return None
+
+        latest = messages[-1]
+        tool_calls = list(latest.tool_calls or [])
+        task_indices = [
+            index for index, call in enumerate(tool_calls)
+            if isinstance(call, dict) and call.get("name") == "task"
+        ]
+        if not task_indices:
+            return None
+
+        prior_count = self._prior_task_count(messages[:-1])
+        remaining_total = max(0, self.max_total - prior_count)
+        allowed_task_calls = min(self.max_concurrent, remaining_total)
+        if len(task_indices) <= allowed_task_calls:
+            return None
+
+        drop_indices = set(task_indices[allowed_task_calls:])
+        retained = [call for index, call in enumerate(tool_calls) if index not in drop_indices]
+        dropped = len(drop_indices)
+        note = (
+            f"{_SUBAGENT_LIMIT_NOTE} Allowed {allowed_task_calls} task call(s) in this response; "
+            f"withheld {dropped}."
+        )
+        logger.warning(
+            "Bounded specialist delegation: prior=%d allowed=%d withheld=%d max_concurrent=%d max_total=%d",
+            prior_count,
+            allowed_task_calls,
+            dropped,
+            self.max_concurrent,
+            self.max_total,
+        )
+        return {"messages": [self._clone_with_calls(latest, retained, note)]}
+
+    def after_model(self, state, runtime):
+        """Trim excess task calls before the graph dispatches them."""
+        return self._enforce(state)
+
+    async def aafter_model(self, state, runtime):
+        """Async equivalent of the synchronous delegation guard."""
+        return self._enforce(state)
+
