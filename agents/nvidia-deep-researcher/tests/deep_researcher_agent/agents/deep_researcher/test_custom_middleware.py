@@ -1986,3 +1986,99 @@ class TestPlanPersistenceMiddleware:
         assert error_detail not in str(exc.value)
         assert error_detail not in caplog.text
         assert log_content_metadata(f"/shared/plan.json: {error_detail}") in caplog.text
+
+
+class TestSubagentDelegationLimitMiddleware:
+    """DeerFlow-inspired hard limits for native DeepAgents task delegation."""
+
+    @staticmethod
+    def _task(call_id: str) -> dict[str, object]:
+        return {
+            "name": "task",
+            "args": {"description": f"specialist task {call_id}"},
+            "id": call_id,
+            "type": "tool_call",
+        }
+
+    def test_limits_parallel_task_calls_and_preserves_other_tools(self) -> None:
+        from deep_researcher_agent.agents.deep_researcher.custom_middleware import (
+            SubagentDelegationLimitMiddleware,
+        )
+
+        message = AIMessage(
+            content="",
+            tool_calls=[
+                self._task("task-1"),
+                {"name": "think", "args": {"thought": "plan"}, "id": "think-1", "type": "tool_call"},
+                self._task("task-2"),
+                self._task("task-3"),
+            ],
+        )
+        middleware = SubagentDelegationLimitMiddleware(max_concurrent=2, max_total=5)
+
+        update = middleware.after_model({"messages": [HumanMessage(content="Research"), message]}, None)
+
+        assert update is not None
+        retained = update["messages"][0]
+        assert [call["id"] for call in retained.tool_calls] == ["task-1", "think-1", "task-2"]
+        assert "withheld 1" in retained.content
+
+    def test_enforces_total_limit_across_prior_model_turns(self) -> None:
+        from deep_researcher_agent.agents.deep_researcher.custom_middleware import (
+            SubagentDelegationLimitMiddleware,
+        )
+
+        previous = AIMessage(
+            content="",
+            tool_calls=[self._task(f"prior-{index}") for index in range(3)],
+        )
+        latest = AIMessage(
+            content="",
+            tool_calls=[self._task(f"next-{index}") for index in range(3)],
+        )
+        middleware = SubagentDelegationLimitMiddleware(max_concurrent=4, max_total=4)
+
+        update = middleware.after_model(
+            {"messages": [HumanMessage(content="Research"), previous, latest]},
+            None,
+        )
+
+        assert update is not None
+        retained = update["messages"][0]
+        assert [call["id"] for call in retained.tool_calls] == ["next-0"]
+        assert "Allowed 1 task call" in retained.content
+
+    def test_allows_calls_within_both_limits(self) -> None:
+        from deep_researcher_agent.agents.deep_researcher.custom_middleware import (
+            SubagentDelegationLimitMiddleware,
+        )
+
+        latest = AIMessage(content="", tool_calls=[self._task("task-1"), self._task("task-2")])
+        middleware = SubagentDelegationLimitMiddleware(max_concurrent=2, max_total=4)
+
+        assert middleware.after_model({"messages": [latest]}, None) is None
+
+    def test_rejects_limits_above_the_hard_ceiling(self) -> None:
+        from deep_researcher_agent.agents.deep_researcher.custom_middleware import (
+            SubagentDelegationLimitMiddleware,
+        )
+
+        with pytest.raises(ValueError, match="max_concurrent"):
+            SubagentDelegationLimitMiddleware(max_concurrent=11)
+        with pytest.raises(ValueError, match="max_total"):
+            SubagentDelegationLimitMiddleware(max_total=14)
+
+    @pytest.mark.asyncio
+    async def test_async_hook_applies_the_same_limit(self) -> None:
+        from deep_researcher_agent.agents.deep_researcher.custom_middleware import (
+            SubagentDelegationLimitMiddleware,
+        )
+
+        latest = AIMessage(content="", tool_calls=[self._task(f"task-{index}") for index in range(3)])
+        middleware = SubagentDelegationLimitMiddleware(max_concurrent=2, max_total=5)
+
+        update = await middleware.aafter_model({"messages": [latest]}, None)
+
+        assert update is not None
+        assert len([call for call in update["messages"][0].tool_calls if call["name"] == "task"]) == 2
+
