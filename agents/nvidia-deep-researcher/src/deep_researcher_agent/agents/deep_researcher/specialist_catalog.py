@@ -509,7 +509,7 @@ SPECIALIST_ROLE_ROWS = [
     ],
     [
         "Strategic Intelligence and Forecasting",
-        "Economic Forecasting Agent"
+        "Strategic Economic Forecasting Agent"
     ],
     [
         "Strategic Intelligence and Forecasting",
