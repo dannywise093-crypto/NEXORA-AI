@@ -81,6 +81,38 @@ NEXORA already has a separate NVIDIA Deep Research backend and a 200-role specia
 - Require authentication, per-user/thread authorization, rate limits, execution budgets and durable job ownership before production exposure.
 - Run tests and a real end-to-end research evaluation before enabling any new orchestration path.
 
+
+
+## Capability adoption: preserve NVIDIA, adopt selectively
+
+The NVIDIA runtime already implements much of the capability set that makes DeerFlow useful. Do not build a second agent runtime beside it.
+
+### Already implemented in the NVIDIA research engine
+
+- A lead orchestrator with staged source routing, planning, research, specialist review, and writer-owned synthesis.
+- A 200-role on-demand specialist catalogue registered as native DeepAgents subagents.
+- Bounded parallel researcher workers, per-job model/tool/resource limits, retry middleware, and explicit failure handling.
+- Read-only, assigned skill collections; optional job-scoped Modal/OpenShell sandbox providers; artifact harvesting.
+- Source registries, source allowlists, citation verification, and final-report commit verification.
+- Durable asynchronous jobs, owner/conversation access checks, event persistence, streaming, cancellation, and authorized parent-report follow-up.
+
+### Initial DeerFlow-inspired adoption
+
+The research orchestrator now maintains a compact /shared/research_continuity.json checkpoint ledger across resumptions of the same graph run. It records phase progress, successfully completed queries, specialist outcomes, and unresolved gaps. It is deliberately treated as advisory: the orchestrator must verify the underlying plan, note, and artifact files before skipping work.
+
+Cross-run context remains owner-authorized and uses the existing parent-report follow-up path. The continuity ledger is not a new global memory store and must never contain secrets or private document contents.
+
+### Capabilities intentionally not imported
+
+- DeerFlow's full Gateway, frontend, database schema, model registry, and dependency graph.
+- Its general-purpose channel integrations and scheduler, which are outside the NVIDIA research service's current contract.
+- A second memory backend. NEXORA should extend its existing knowledge/job storage rather than introduce an unscoped parallel memory system.
+- Interactive approval flows for tools that the research agent does not currently need. If write-capable or external-action tools are added later, add authenticated, server-enforced approval gates before exposing them to agents.
+
+### Validation boundary
+
+This adoption changes orchestrator instructions only. It does not add a new database migration, alter NVIDIA model/provider configuration, enable sandbox execution, change Cloudflare routing, or prove a production deployment. Run the NVIDIA package's focused prompt/agent tests and an authenticated end-to-end research job before enabling the revised workflow in production.
+
 ## Current status
 
-This change adds a pinned, inspectable upstream source reference and this integration guide only. It does **not** claim that DeerFlow has been merged into the NVIDIA runtime, that the backend is deployed, or that the combined system is production-ready.
+The pinned DeerFlow source reference is merged into NEXORA main. The first selective adoption adds a checkpoint-continuity protocol to the existing NVIDIA orchestrator and documents the capability mapping above. This is not a full DeerFlow runtime import and does not claim a production deployment.

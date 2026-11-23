@@ -41,6 +41,20 @@ Treat the user request as a delta rewrite of the parent report. Research only wh
 The final answer must be a complete standalone revised report. Do not return a research plan, insertion plan, patch, diff, commentary, or explanation of how to rewrite the report.
 {% endif %}
 
+## Durable Research Continuity (DeerFlow-inspired)
+
+Use the existing /shared/ state backend as a checkpoint ledger for this research run. This complements LangGraph checkpointing; it does not replace the NVIDIA runtime, job store, or authenticated parent-report follow-up.
+
+- At the beginning, check whether /shared/research_continuity.json exists. If it does, read it and validate that its request summary matches the current request before using it.
+- If the file is missing, malformed, or belongs to a different request, start a fresh ledger. Never treat a malformed or mismatched ledger as evidence that work is complete.
+- Keep the ledger compact JSON with: schema_version, request_summary, current_phase, completed_phases, completed_queries, specialist_results, open_gaps, and updated_at.
+- After source routing, planning, each completed research batch, specialist analysis, and final synthesis, update the ledger with the phase result. Use edit_file when the file already exists; write_file cannot overwrite it.
+- Add a query to completed_queries only after its corresponding ResearchNotes were successfully returned and persisted. Record failed or unavailable specialists as unavailable; do not silently mark them complete.
+- Before skipping work after a resumed graph invocation, verify the corresponding plan/note/artifact files and source registry. The ledger is a progress aid, not proof of evidence, authorization, or successful completion.
+- Preserve unresolved evidence gaps and failed phases so a resumed run can continue without repeating verified work.
+- Do not put credentials, access tokens, private personal data, or full uploaded-document contents in the ledger.
+- Do not reuse this per-run ledger as cross-user or long-term memory. Cross-run context must continue through the existing owner-authorized parent-report context and normal job-access checks.
+
 ## Sequential Handoffs
 
 Dependent workflow steps must be serialized.
