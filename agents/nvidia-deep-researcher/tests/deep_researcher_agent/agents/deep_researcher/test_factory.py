@@ -247,7 +247,7 @@ def test_subagents_route_tools_and_writer_skills():
     subagents = build_deep_research_subagents(_graph_context(runtime=runtime))
 
     by_name = {subagent["name"]: subagent for subagent in subagents}
-    assert set(by_name) == {
+    core_names = {
         "source-router-agent",
         "planner-agent",
         "writer-agent",
@@ -258,6 +258,20 @@ def test_subagents_route_tools_and_writer_skills():
         "evidence-verification-agent",
         "performance-reliability-agent",
     }
+    catalog_names = {specialist["agent_name"] for specialist in SPECIALIST_ROLES}
+
+    # The 200 NEXORA specialists must be present in the actual DeepAgents
+    # subagent registry, not merely listed in the catalogue.
+    assert len(SPECIALIST_ROLES) == 200
+    assert len(catalog_names) == 200
+    assert core_names.issubset(by_name)
+    assert catalog_names.issubset(by_name)
+    assert len(by_name) == len(core_names | catalog_names)
+    for specialist in SPECIALIST_ROLES:
+        registered = by_name[specialist["agent_name"]]
+        assert registered["model"] is not None
+        assert specialist["name"] in registered["system_prompt"]
+        assert specialist["division"] in registered["system_prompt"]
     assert by_name["source-router-agent"]["response_format"] is SourceRoutingPlan
     assert _tool_names(by_name["source-router-agent"]["tools"]) == ["lookup_source_catalog"]
     assert "web_search_tool" not in _tool_names(by_name["source-router-agent"]["tools"])
