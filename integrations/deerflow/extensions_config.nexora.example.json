@@ -1,19 +1,20 @@
 {
   "middlewares": [],
   "mcpServers": {
-    "nvidia-deep-research": {
+    "nexora-cloudflare-research": {
       "enabled": false,
       "type": "http",
-      "url": "$NEXORA_NVIDIA_MCP_URL",
+      "url": "$NEXORA_NEXORA_MCP_URL",
       "headers": {
-        "Authorization": "$NEXORA_NVIDIA_MCP_AUTHORIZATION"
+        "Authorization": "$NEXORA_NEXORA_MCP_AUTHORIZATION"
       },
       "tool_name_prefix": true,
-      "description": "NEXORA's authenticated Cloudflare MCP bridge to the existing NVIDIA Deep Research backend",
+      "description": "Authenticated Cloudflare MCP bridge to NEXORA's currently deployed multi-agent research workflow. This is distinct from the separately hosted NVIDIA Deep Researcher Python backend.",
       "routing": {
         "mode": "prefer",
         "priority": 95,
         "keywords": [
+          "research",
           "deep research",
           "evidence-based research",
           "literature review",
