@@ -116,3 +116,28 @@ This adoption changes orchestrator instructions only. It does not add a new data
 ## Current status
 
 The pinned DeerFlow source reference is merged into NEXORA main. The first selective adoption adds a checkpoint-continuity protocol to the existing NVIDIA orchestrator and documents the capability mapping above. This is not a full DeerFlow runtime import and does not claim a production deployment.
+
+
+## Enforced subagent delegation limits
+
+The NVIDIA research orchestrator now installs a NEXORA-owned
+`SubagentDelegationLimitMiddleware`, inspired by DeerFlow's bounded subagent
+delegation pattern. The middleware enforces two limits before task dispatch:
+
+- At most 10 `task()` calls in one model response.
+- At most 13 `task()` calls across one research run.
+
+The total budget reserves capacity for source routing, planning, up to 10
+specialist assessments, and writer publication. Existing prompt guidance still
+prefers 2–6 specialists and allows up to 10 only for genuinely broad work.
+Non-task tool calls are preserved. Excess task calls are withheld before
+execution and the orchestrator receives a bounded note so it can continue with
+the available results.
+
+The limit is enforced from the current run's message history; it does not add a
+second job store, change the NVIDIA workflow engine, or create cross-user memory.
+Focused tests cover parallel and total limits, preservation of non-task calls,
+invalid configuration, and the async middleware hook.
+
+This is a code-level adoption of one DeerFlow guardrail, not a wholesale DeerFlow
+runtime import. The NVIDIA backend remains the sole research engine.
