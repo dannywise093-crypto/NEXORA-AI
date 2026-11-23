@@ -36,16 +36,38 @@ The bridge endpoint is:
 
 ## DeerFlow configuration
 
-Copy `extensions_config.nexora.example.json` into the DeerFlow configuration
-location described by the pinned DeerFlow version. Set these environment
-variables in the DeerFlow runtime:
+The NEXORA example file
+`integrations/deerflow/extensions_config.nexora.example.json` now includes
+both NEXORA MCP routes:
+
+- `nexora-cloudflare-research` → `https://nexora-ai-9i7.pages.dev/mcp/nexora`
+  (the currently deployed Atlas research workflow).
+- `nexora-nvidia-deep-research` → `https://nexora-ai-9i7.pages.dev/mcp/nvidia`
+  (the separate NVIDIA async-job backend; it remains unavailable until that
+  backend is actually deployed and `DEEP_RESEARCHER_URL` is configured).
+
+Copy the example file to `extensions_config.json` in the root of the DeerFlow
+checkout. In the DeerFlow backend environment set:
 
 - `NEXORA_NEXORA_MCP_URL=https://nexora-ai-9i7.pages.dev/mcp/nexora`
 - `NEXORA_NEXORA_MCP_AUTHORIZATION=Bearer <the same dedicated MCP token>`
+- `NEXORA_NVIDIA_MCP_URL=https://nexora-ai-9i7.pages.dev/mcp/nvidia`
+- `NEXORA_NVIDIA_MCP_AUTHORIZATION=Bearer <the same dedicated MCP token>`
 
-Keep the MCP server disabled until the token is set in both places. Enable it
-after deployment and verify that DeerFlow discovers the
-`run_nexora_research` tool.
+Keep both entries disabled until the matching endpoint is ready. The Atlas
+entry can be enabled once its Cloudflare secret is configured and a real
+DeerFlow runtime is available. Keep the NVIDIA entry disabled until a genuine
+NVIDIA backend is running and its Cloudflare Pages variables
+`DEEP_RESEARCHER_URL` and `NEXORA_RESEARCH_API_TOKEN` are configured. Do not
+point `DEEP_RESEARCHER_URL` at the Pages website or the general AI gateway.
+
+DeerFlow prefixes discovered tool names with each server name by default. The
+Atlas route should expose `nexora-cloudflare-research_run_nexora_research`.
+The NVIDIA route should expose the four tools
+`nexora-nvidia-deep-research_list_research_agents`,
+`nexora-nvidia-deep-research_submit_query`,
+`nexora-nvidia-deep-research_poll_query`, and
+`nexora-nvidia-deep-research_get_final_report`.
 
 ## Verification
 
@@ -53,9 +75,12 @@ after deployment and verify that DeerFlow discovers the
 2. Deploy the Pages project from the merged branch.
 3. Confirm an unauthenticated POST receives HTTP 401 after the MCP secret is
    configured.
-4. Configure DeerFlow with the endpoint and bearer token.
+4. Start the official DeerFlow runtime, load the copied extensions config, and
+   verify that it discovers the Atlas research tool.
 5. Run a low-risk factual research question and confirm that the MCP result
    contains an answer and source metadata.
+6. Verify the NVIDIA route separately only after its backend is deployed; list
+   agents, submit a small job, poll it, and retrieve the final report.
 
 ## Full NVIDIA Deep Researcher backend
 
@@ -63,9 +88,7 @@ The separate NVIDIA service still requires its Python API runtime, durable job
 store, and its own `NEXORA_RESEARCH_API_TOKEN`. Its deployment guide is
 `agents/nvidia-deep-researcher/NEXORA-DEPLOYMENT.md`. The existing
 `/mcp/nvidia` bridge remains available for that backend when a real HTTPS
-backend URL and matching secrets are configured. Do not set
-`DEEP_RESEARCHER_URL` to the Pages website or to the general AI gateway: their
-routes are not the NVIDIA async job API.
+backend URL and matching secrets are configured.
 
 Cloudflare Workers Free has request and CPU limits; long research calls must be
 tested against the actual workflow and may need to be shortened or split. See

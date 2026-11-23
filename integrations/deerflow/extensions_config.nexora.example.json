@@ -1,6 +1,28 @@
 {
   "middlewares": [],
   "mcpServers": {
+    "nexora-nvidia-deep-research": {
+      "enabled": false,
+      "type": "http",
+      "url": "$NEXORA_NVIDIA_MCP_URL",
+      "headers": {
+        "Authorization": "$NEXORA_NVIDIA_MCP_AUTHORIZATION"
+      },
+      "tool_name_prefix": true,
+      "session_init_timeout": 60,
+      "description": "NEXORA's authenticated Cloudflare MCP bridge to the NVIDIA Deep Research async-job API. Enable only after a real NVIDIA research backend is deployed and DEEP_RESEARCHER_URL plus the matching Cloudflare secrets are configured.",
+      "routing": {
+        "mode": "prefer",
+        "priority": 100,
+        "keywords": [
+          "NVIDIA Deep Research",
+          "deep research job",
+          "specialist research",
+          "submit research query",
+          "research report"
+        ]
+      }
+    },
     "nexora-cloudflare-research": {
       "enabled": false,
       "type": "http",
@@ -9,18 +31,16 @@
         "Authorization": "$NEXORA_NEXORA_MCP_AUTHORIZATION"
       },
       "tool_name_prefix": true,
-      "description": "Authenticated Cloudflare MCP bridge to NEXORA's currently deployed multi-agent research workflow. This is distinct from the separately hosted NVIDIA Deep Researcher Python backend.",
+      "session_init_timeout": 60,
+      "description": "Authenticated Cloudflare MCP bridge to NEXORA's currently deployed Atlas multi-agent research workflow. It returns an answer and source metadata; it is distinct from the separate NVIDIA Deep Researcher Python job service.",
       "routing": {
         "mode": "prefer",
-        "priority": 95,
+        "priority": 80,
         "keywords": [
-          "research",
-          "deep research",
-          "evidence-based research",
-          "literature review",
-          "technical research",
-          "research report",
-          "source verification"
+          "NEXORA research",
+          "web research",
+          "source-backed answer",
+          "research summary"
         ]
       }
     }
