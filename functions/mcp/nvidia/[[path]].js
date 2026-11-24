@@ -66,7 +66,7 @@ const TOOLS = [
   },
   {
     name: "submit_query",
-    description: "Submit a research question to the real NVIDIA Deep Researcher workflow. The workflow selects and delegates to its registered NEXORA specialist subagents as needed. Returns a job_id and state; if queued, poll with poll_query, then call get_final_report when complete.",
+    description: "Submit a research question to the real NVIDIA Deep Researcher workflow. The workflow selects and delegates to its 200 NEXORA specialist subagents are registered as needed; they are on-demand subagents, not 200 separately hosted API services. Returns a job_id and state; if queued, poll with poll_query, then call get_final_report when complete.",
     inputSchema: {
       type: "object",
       properties: { query: { type: "string", minLength: 1, maxLength: 32768, description: "Research question to investigate." } },
